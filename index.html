@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TSV → Tableau Gmail</title>
+<title>Tableau → Gmail</title>
 <style>
   :root {
     --bg: #ffffff;
@@ -79,6 +79,24 @@
   .controls input[type="checkbox"] {
     cursor: pointer;
   }
+  .controls select {
+    font-size: 13px;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .controls select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  #detected {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
   button {
     margin-left: auto;
     padding: 8px 16px;
@@ -145,15 +163,20 @@
 </head>
 <body>
 
-<h1>TSV → Tableau Gmail</h1>
-<p class="intro">Colle un texte tabulé (copié depuis Excel, un export, etc.). Le bouton copie le tableau <em>rendu</em> dans ton presse-papier — colle-le dans Gmail avec Ctrl+V.</p>
+<h1>Tableau → Gmail</h1>
+<p class="intro">Colle un texte tabulé (copié depuis Excel, un export, etc.) ou un tableau encadré (généré par Claude Code, Markdown, ASCII). Le bouton copie le tableau <em>rendu</em> dans ton presse-papier — colle-le dans Gmail avec Ctrl+V.</p>
 
-<label for="src">Texte tabulé en entrée</label>
-<textarea id="src" spellcheck="false" placeholder="Colle ici un tableau séparé par des tabulations…">Date	J	Compte	Libellé	Référence	Débit	Crédit	L
+<label for="src">Tableau en entrée <span id="detected"></span></label>
+<textarea id="src" spellcheck="false" placeholder="Colle ici un tableau tabulé ou encadré…">Date	J	Compte	Libellé	Référence	Débit	Crédit	L
 31/03/2025	ACHA	60701	FACTURE-2025-000124 IMPUTATION DEVIS 4345	2025-000124	350,00	0	
 17/03/2025	ACHA	60701	F-2025-000119 IMPUTATION DEVIS 4345	20250724065712	315,00	0</textarea>
 
 <div class="controls">
+  <select id="format" aria-label="Format d'entrée">
+    <option value="auto">Format : auto</option>
+    <option value="tsv">Texte tabulé</option>
+    <option value="boxed">Tableau encadré</option>
+  </select>
   <label class="opt"><input type="checkbox" id="hasHeader" checked> Première ligne = en-tête</label>
   <label class="opt"><input type="checkbox" id="bordered" checked> Bordures</label>
   <label class="opt"><input type="checkbox" id="zebra"> Lignes alternées</label>
@@ -180,18 +203,84 @@
   const zebra = document.getElementById('zebra');
   const copyBtn = document.getElementById('copyBtn');
   const status = document.getElementById('status');
+  const format = document.getElementById('format');
+  const detected = document.getElementById('detected');
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
-  function buildTable() {
-    const lines = src.value.split(/\r?\n/).filter(l => l.length > 0);
-    if (!lines.length) return '';
-    const rows = lines.map(l => l.split('\t'));
+  // ─── PARSERS ──────────────────────────────────────────────────────────────
+  // Bloc autonome (aucune dépendance au DOM) : extrait tel quel par les tests.
+  const RE_VERT = /[│┃║|]/;
+  const RE_BOX = /[─━═┌┬┐├┼┤└┴┘╔╦╗╠╬╣╚╩╝╭╮╰╯]/;
+
+  // Bordure ou séparation : └───┴───┘, ├──┼──┤, |---|---|, +----+, |:--|--:|
+  function isSeparatorLine(line) {
+    const s = line.trim();
+    if (!s) return false;
+    const rest = s.replace(/[│┃║|\s]/g, '');
+    if (!rest) return false;
+    // Reste-t-il autre chose que des traits et des jonctions ? Alors c'est du contenu.
+    if (/[^─━═┌┬┐├┼┤└┴┘╔╦╗╠╬╣╚╩╝╭╮╰╯+=_:-]/.test(rest)) return false;
+    if (RE_BOX.test(rest)) return true;   // box-drawing Unicode
+    if (/[-=_]{3,}/.test(s)) return true; // ASCII : +----+ ou |----|
+    if (/:-|-:/.test(s)) return true;     // séparateur Markdown aligné
+    return false;                         // ex. « │ - │ - │ » : des cellules, pas une bordure
+  }
+
+  function splitCells(line) {
+    return line.trim()
+      .replace(/^[│┃║|]+/, '')
+      .replace(/[│┃║|]+$/, '')
+      .split(/[│┃║|]/)
+      .map(c => c.trim());
+  }
+
+  // Tableaux encadrés : box-drawing Unicode (Claude Code), ASCII (+--+) ou Markdown.
+  // Une ligne de contenu = une ligne du tableau ; le texte hors tableau est ignoré.
+  function parseBoxed(text) {
+    const rows = [];
+    text.split(/\r?\n/).forEach(line => {
+      if (!line.trim() || isSeparatorLine(line) || !RE_VERT.test(line)) return;
+      rows.push(splitCells(line));
+    });
+    return rows;
+  }
+
+  function parseTsv(text) {
+    return text.split(/\r?\n/).filter(l => l.length > 0).map(l => l.split('\t'));
+  }
+
+  function detectFormat(text) {
+    if (RE_BOX.test(text)) return 'boxed';
+    if (text.indexOf('\t') !== -1) return 'tsv';
+    const piped = text.split(/\r?\n/).filter(l => /^[|+]/.test(l.trim())).length;
+    return piped >= 2 ? 'boxed' : 'tsv';
+  }
+
+  function parseInput(text, fmt) {
+    const chosen = (fmt && fmt !== 'auto') ? fmt : detectFormat(text);
+    const rows = chosen === 'boxed' ? parseBoxed(text) : parseTsv(text);
     // Normaliser : toutes les lignes doivent avoir le même nombre de colonnes
     const maxCols = rows.reduce((m, r) => Math.max(m, r.length), 0);
     rows.forEach(r => { while (r.length < maxCols) r.push(''); });
+    return { format: chosen, rows: rows };
+  }
+  // ─── FIN PARSERS ──────────────────────────────────────────────────────────
+
+  const FORMAT_LABELS = {
+    tsv: 'texte tabulé',
+    boxed: 'tableau encadré'
+  };
+
+  function buildTable() {
+    const parsed = parseInput(src.value, format.value);
+    detected.textContent = format.value === 'auto' && parsed.rows.length
+      ? 'détecté : ' + FORMAT_LABELS[parsed.format]
+      : '';
+    const rows = parsed.rows;
+    if (!rows.length) return '';
     const tableStyle = 'border-collapse: collapse; font-family: Arial, sans-serif; font-size: 13px;';
     const cellBase = bordered.checked
       ? 'border: 1px solid #cccccc; padding: 6px 10px;'
@@ -226,6 +315,7 @@
   }
 
   src.addEventListener('input', render);
+  format.addEventListener('change', render);
   hasHeader.addEventListener('change', render);
   bordered.addEventListener('change', render);
   zebra.addEventListener('change', render);
