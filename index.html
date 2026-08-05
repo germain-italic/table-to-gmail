@@ -322,7 +322,6 @@
 
   // ─── PARSERS ──────────────────────────────────────────────────────────────
   // Bloc autonome (aucune dépendance au DOM) : extrait tel quel par les tests.
-  const RE_VERT = /[│┃║|]/;
   const RE_BOX = /[─━═┌┬┐├┼┤└┴┘╔╦╗╠╬╣╚╩╝╭╮╰╯]/;
 
   // Bordure ou séparation : └───┴───┘, ├──┼──┤, |---|---|, +----+, |:--|--:|
@@ -339,21 +338,31 @@
     return false;                         // ex. « │ - │ - │ » : des cellules, pas une bordure
   }
 
-  function splitCells(line) {
+  // Le séparateur de colonnes dépend du tableau : dès qu'il trace ses bordures
+  // en Unicode, un « | » ASCII appartient au contenu d'une cellule et ne doit
+  // surtout pas découper une colonne de plus.
+  function verticalChars(text) {
+    return /[│┃║]/.test(text) ? '│┃║' : '|';
+  }
+
+  function splitCells(line, chars) {
+    const cls = '[' + chars + ']';
     return line.trim()
-      .replace(/^[│┃║|]+/, '')
-      .replace(/[│┃║|]+$/, '')
-      .split(/[│┃║|]/)
+      .replace(new RegExp('^' + cls + '+'), '')
+      .replace(new RegExp(cls + '+$'), '')
+      .split(new RegExp(cls))
       .map(c => c.trim());
   }
 
   // Tableaux encadrés : box-drawing Unicode (Claude Code), ASCII (+--+) ou Markdown.
   // Une ligne de contenu = une ligne du tableau ; le texte hors tableau est ignoré.
   function parseBoxed(text) {
+    const chars = verticalChars(text);
+    const vert = new RegExp('[' + chars + ']');
     const rows = [];
     text.split(/\r?\n/).forEach(line => {
-      if (!line.trim() || isSeparatorLine(line) || !RE_VERT.test(line)) return;
-      rows.push(splitCells(line));
+      if (!line.trim() || isSeparatorLine(line) || !vert.test(line)) return;
+      rows.push(splitCells(line, chars));
     });
     return rows;
   }
