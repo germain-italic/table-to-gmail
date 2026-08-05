@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TSV → Tableau Gmail</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #fafaf7;
+    --border: #e0ddd5;
+    --border-strong: #c7c4ba;
+    --text: #1a1a1a;
+    --text-muted: #6b6b6b;
+    --accent: #2c5f8d;
+    --accent-hover: #1e4a73;
+    --success: #1d7a4d;
+    --danger: #b3261e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    line-height: 1.5;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0 0 0.5rem;
+  }
+  p.intro {
+    color: var(--text-muted);
+    margin: 0 0 1.5rem;
+    font-size: 14px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  textarea {
+    width: 100%;
+    min-height: 180px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    resize: vertical;
+  }
+  textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(44, 95, 141, 0.15);
+  }
+  .controls {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin: 14px 0 1.5rem;
+    flex-wrap: wrap;
+  }
+  .controls label.opt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0;
+    cursor: pointer;
+  }
+  .controls input[type="checkbox"] {
+    cursor: pointer;
+  }
+  button {
+    margin-left: auto;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--accent-hover); }
+  button:active { transform: scale(0.98); }
+  .preview-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  #preview {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    overflow-x: auto;
+    min-height: 60px;
+  }
+  #preview table {
+    margin: 0;
+  }
+  #status {
+    font-size: 13px;
+    margin-top: 12px;
+    min-height: 20px;
+    font-weight: 500;
+  }
+  #status.success { color: var(--success); }
+  #status.error { color: var(--danger); }
+  details {
+    margin-top: 1.5rem;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  details summary {
+    cursor: pointer;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  details pre {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px;
+    overflow-x: auto;
+    font-size: 11px;
+    margin: 10px 0 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+
+<h1>TSV → Tableau Gmail</h1>
+<p class="intro">Colle un texte tabulé (copié depuis Excel, un export, etc.). Le bouton copie le tableau <em>rendu</em> dans ton presse-papier — colle-le dans Gmail avec Ctrl+V.</p>
+
+<label for="src">Texte tabulé en entrée</label>
+<textarea id="src" spellcheck="false" placeholder="Colle ici un tableau séparé par des tabulations…">Date	J	Compte	Libellé	Référence	Débit	Crédit	L
+31/03/2025	ACHA	60701	FACTURE-2025-000124 IMPUTATION DEVIS 4345	2025-000124	350,00	0	
+17/03/2025	ACHA	60701	F-2025-000119 IMPUTATION DEVIS 4345	20250724065712	315,00	0</textarea>
+
+<div class="controls">
+  <label class="opt"><input type="checkbox" id="hasHeader" checked> Première ligne = en-tête</label>
+  <label class="opt"><input type="checkbox" id="bordered" checked> Bordures</label>
+  <label class="opt"><input type="checkbox" id="zebra"> Lignes alternées</label>
+  <button id="copyBtn" type="button">Copier le tableau</button>
+</div>
+
+<div class="preview-label">Aperçu</div>
+<div id="preview"></div>
+
+<div id="status"></div>
+
+<details>
+  <summary>Voir le code HTML source</summary>
+  <pre id="htmlSource"></pre>
+</details>
+
+<script>
+(function() {
+  const src = document.getElementById('src');
+  const preview = document.getElementById('preview');
+  const htmlSource = document.getElementById('htmlSource');
+  const hasHeader = document.getElementById('hasHeader');
+  const bordered = document.getElementById('bordered');
+  const zebra = document.getElementById('zebra');
+  const copyBtn = document.getElementById('copyBtn');
+  const status = document.getElementById('status');
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function buildTable() {
+    const lines = src.value.split(/\r?\n/).filter(l => l.length > 0);
+    if (!lines.length) return '';
+    const rows = lines.map(l => l.split('\t'));
+    // Normaliser : toutes les lignes doivent avoir le même nombre de colonnes
+    const maxCols = rows.reduce((m, r) => Math.max(m, r.length), 0);
+    rows.forEach(r => { while (r.length < maxCols) r.push(''); });
+    const tableStyle = 'border-collapse: collapse; font-family: Arial, sans-serif; font-size: 13px;';
+    const cellBase = bordered.checked
+      ? 'border: 1px solid #cccccc; padding: 6px 10px;'
+      : 'padding: 6px 10px;';
+    const thStyle = cellBase + ' background: #f3f3f3; font-weight: bold; text-align: left;';
+
+    let html = '<table style="' + tableStyle + '">';
+    let startIdx = 0;
+    if (hasHeader.checked && rows.length > 0) {
+      html += '<thead><tr>';
+      rows[0].forEach(c => html += '<th style="' + thStyle + '">' + esc(c) + '</th>');
+      html += '</tr></thead>';
+      startIdx = 1;
+    }
+    html += '<tbody>';
+    for (let i = startIdx; i < rows.length; i++) {
+      const bg = (zebra.checked && (i - startIdx) % 2 === 1) ? ' background: #fafafa;' : '';
+      html += '<tr>';
+      rows[i].forEach(c => html += '<td style="' + cellBase + bg + '">' + esc(c) + '</td>');
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    return html;
+  }
+
+  function render() {
+    const html = buildTable();
+    preview.innerHTML = html;
+    htmlSource.textContent = html;
+    status.textContent = '';
+    status.className = '';
+  }
+
+  src.addEventListener('input', render);
+  hasHeader.addEventListener('change', render);
+  bordered.addEventListener('change', render);
+  zebra.addEventListener('change', render);
+
+  copyBtn.addEventListener('click', async () => {
+    const html = buildTable();
+    if (!html) {
+      status.textContent = 'Rien à copier — colle un tableau d\'abord.';
+      status.className = 'error';
+      return;
+    }
+    const plain = preview.innerText;
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([plain], { type: 'text/plain' })
+        })]);
+      } else {
+        // Fallback : sélection + execCommand
+        const range = document.createRange();
+        range.selectNodeContents(preview);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        document.execCommand('copy');
+        sel.removeAllRanges();
+      }
+      status.textContent = '✓ Copié — colle directement dans Gmail (Ctrl+V)';
+      status.className = 'success';
+    } catch (e) {
+      status.textContent = 'Erreur de copie : ' + e.message;
+      status.className = 'error';
+    }
+  });
+
+  render();
+})();
+</script>
+
+</body>
+</html>
