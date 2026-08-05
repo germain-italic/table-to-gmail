@@ -79,7 +79,7 @@
   .controls input[type="checkbox"] {
     cursor: pointer;
   }
-  .controls select {
+  .controls select, .pane-toolbar select {
     font-size: 13px;
     padding: 5px 8px;
     border: 1px solid var(--border);
@@ -88,7 +88,7 @@
     color: var(--text);
     cursor: pointer;
   }
-  .controls select:focus {
+  .controls select:focus, .pane-toolbar select:focus {
     outline: none;
     border-color: var(--accent);
   }
@@ -116,11 +116,76 @@
     color: var(--text-muted);
     margin-bottom: 6px;
   }
+  /* Onglets : structure et classes Bootstrap 5.3 (.nav-tabs / .tab-content),
+     CSS repris localement pour garder la page autonome, palette du site. */
+  .nav {
+    display: flex;
+    flex-wrap: wrap;
+    padding-left: 0;
+    margin: 0;
+    list-style: none;
+  }
+  .nav-tabs {
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-tabs .nav-link {
+    margin: 0 0 -1px 0;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--accent);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .nav-tabs .nav-link:hover {
+    background: none;
+    border-color: var(--surface) var(--surface) var(--border);
+    isolation: isolate;
+  }
+  .nav-tabs .nav-link:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(44, 95, 141, 0.15);
+  }
+  .nav-tabs .nav-link.active {
+    color: var(--text);
+    font-weight: 500;
+    background: var(--bg);
+    border-color: var(--border) var(--border) var(--bg);
+  }
+  .nav-tabs .nav-link:active { transform: none; }
+  .tab-content > .tab-pane { display: none; }
+  .tab-content > .tab-pane.active { display: block; }
+  .tab-content {
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    padding: 14px;
+  }
+  .pane-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  pre.out {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px;
+    overflow-x: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    margin: 0;
+    min-height: 60px;
+    white-space: pre;
+  }
   #preview {
     background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 14px;
     overflow-x: auto;
     min-height: 60px;
   }
@@ -164,7 +229,7 @@
 <body>
 
 <h1>Tableau → Gmail</h1>
-<p class="intro">Colle un texte tabulé (copié depuis Excel, un export, etc.) ou un tableau encadré (généré par Claude Code, Markdown, ASCII). Le bouton copie le tableau <em>rendu</em> dans ton presse-papier — colle-le dans Gmail avec Ctrl+V.</p>
+<p class="intro">Colle un texte tabulé (copié depuis Excel, un export, etc.) ou un tableau encadré (généré par Claude Code, Markdown, ASCII). Choisis la sortie voulue dans les onglets, puis copie : la sortie Gmail arrive <em>rendue</em> dans le presse-papier (Ctrl+V dans Gmail), les autres en texte brut.</p>
 
 <label for="src">Tableau en entrée <span id="detected"></span></label>
 <textarea id="src" spellcheck="false" placeholder="Colle ici un tableau tabulé ou encadré…">Date	J	Compte	Libellé	Référence	Débit	Crédit	L
@@ -177,21 +242,63 @@
     <option value="tsv">Texte tabulé</option>
     <option value="boxed">Tableau encadré</option>
   </select>
-  <label class="opt"><input type="checkbox" id="hasHeader" checked> Première ligne = en-tête</label>
-  <label class="opt"><input type="checkbox" id="bordered" checked> Bordures</label>
-  <label class="opt"><input type="checkbox" id="zebra"> Lignes alternées</label>
+  <label class="opt" data-opt="hasHeader"><input type="checkbox" id="hasHeader" checked> Première ligne = en-tête</label>
+  <label class="opt" data-opt="bordered"><input type="checkbox" id="bordered" checked> Bordures</label>
+  <label class="opt" data-opt="zebra"><input type="checkbox" id="zebra"> Lignes alternées</label>
   <button id="copyBtn" type="button">Copier le tableau</button>
 </div>
 
-<div class="preview-label">Aperçu</div>
-<div id="preview"></div>
+<div class="preview-label">Sortie</div>
+
+<ul class="nav nav-tabs" id="outputTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="tab-gmail" data-bs-target="#pane-gmail" data-output="gmail" type="button" role="tab" aria-controls="pane-gmail" aria-selected="true">Gmail</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-html" data-bs-target="#pane-html" data-output="html" type="button" role="tab" aria-controls="pane-html" aria-selected="false" tabindex="-1">HTML propre</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-markdown" data-bs-target="#pane-markdown" data-output="markdown" type="button" role="tab" aria-controls="pane-markdown" aria-selected="false" tabindex="-1">Markdown</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-list" data-bs-target="#pane-list" data-output="list" type="button" role="tab" aria-controls="pane-list" aria-selected="false" tabindex="-1">Liste</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-csv" data-bs-target="#pane-csv" data-output="csv" type="button" role="tab" aria-controls="pane-csv" aria-selected="false" tabindex="-1">CSV</button>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <div class="tab-pane active" id="pane-gmail" role="tabpanel" aria-labelledby="tab-gmail" tabindex="0">
+    <div id="preview"></div>
+    <details>
+      <summary>Voir le code HTML source</summary>
+      <pre id="htmlSource"></pre>
+    </details>
+  </div>
+  <div class="tab-pane" id="pane-html" role="tabpanel" aria-labelledby="tab-html" tabindex="0">
+    <pre class="out" id="out-html"></pre>
+  </div>
+  <div class="tab-pane" id="pane-markdown" role="tabpanel" aria-labelledby="tab-markdown" tabindex="0">
+    <pre class="out" id="out-markdown"></pre>
+  </div>
+  <div class="tab-pane" id="pane-list" role="tabpanel" aria-labelledby="tab-list" tabindex="0">
+    <pre class="out" id="out-list"></pre>
+  </div>
+  <div class="tab-pane" id="pane-csv" role="tabpanel" aria-labelledby="tab-csv" tabindex="0">
+    <div class="pane-toolbar">
+      <label for="csvSep">Séparateur</label>
+      <select id="csvSep">
+        <option value="comma">Virgule , (standard)</option>
+        <option value="semicolon">Point-virgule ; (Excel FR)</option>
+        <option value="tab">Tabulation</option>
+      </select>
+    </div>
+    <pre class="out" id="out-csv"></pre>
+  </div>
+</div>
 
 <div id="status"></div>
-
-<details>
-  <summary>Voir le code HTML source</summary>
-  <pre id="htmlSource"></pre>
-</details>
 
 <script>
 (function() {
@@ -205,6 +312,9 @@
   const status = document.getElementById('status');
   const format = document.getElementById('format');
   const detected = document.getElementById('detected');
+  const csvSep = document.getElementById('csvSep');
+  const tabs = [...document.querySelectorAll('#outputTabs .nav-link')];
+  const optLabels = [...document.querySelectorAll('.controls label.opt')];
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -269,27 +379,21 @@
   }
   // ─── FIN PARSERS ──────────────────────────────────────────────────────────
 
-  const FORMAT_LABELS = {
-    tsv: 'texte tabulé',
-    boxed: 'tableau encadré'
-  };
+  // ─── GÉNÉRATEURS ──────────────────────────────────────────────────────────
+  // Bloc autonome (aucune dépendance au DOM) : extrait tel quel par les tests.
 
-  function buildTable() {
-    const parsed = parseInput(src.value, format.value);
-    detected.textContent = format.value === 'auto' && parsed.rows.length
-      ? 'détecté : ' + FORMAT_LABELS[parsed.format]
-      : '';
-    const rows = parsed.rows;
+  // Sortie Gmail : styles en ligne, seuls interprétés par le compositeur Gmail.
+  function buildGmail(rows, o) {
     if (!rows.length) return '';
     const tableStyle = 'border-collapse: collapse; font-family: Arial, sans-serif; font-size: 13px;';
-    const cellBase = bordered.checked
+    const cellBase = o.bordered
       ? 'border: 1px solid #cccccc; padding: 6px 10px;'
       : 'padding: 6px 10px;';
     const thStyle = cellBase + ' background: #f3f3f3; font-weight: bold; text-align: left;';
 
     let html = '<table style="' + tableStyle + '">';
     let startIdx = 0;
-    if (hasHeader.checked && rows.length > 0) {
+    if (o.hasHeader) {
       html += '<thead><tr>';
       rows[0].forEach(c => html += '<th style="' + thStyle + '">' + esc(c) + '</th>');
       html += '</tr></thead>';
@@ -297,54 +401,203 @@
     }
     html += '<tbody>';
     for (let i = startIdx; i < rows.length; i++) {
-      const bg = (zebra.checked && (i - startIdx) % 2 === 1) ? ' background: #fafafa;' : '';
+      const bg = (o.zebra && (i - startIdx) % 2 === 1) ? ' background: #fafafa;' : '';
       html += '<tr>';
       rows[i].forEach(c => html += '<td style="' + cellBase + bg + '">' + esc(c) + '</td>');
       html += '</tr>';
     }
-    html += '</tbody></table>';
-    return html;
+    return html + '</tbody></table>';
   }
 
+  // Sortie HTML : balises nues, aucun style ni attribut, indentée.
+  function buildCleanHtml(rows, hasHeader) {
+    if (!rows.length) return '';
+    const tr = (cells, tag) =>
+      '    <tr>' + cells.map(c => `<${tag}>` + esc(c) + `</${tag}>`).join('') + '</tr>';
+    const out = ['<table>'];
+    let startIdx = 0;
+    if (hasHeader) {
+      out.push('  <thead>', tr(rows[0], 'th'), '  </thead>');
+      startIdx = 1;
+    }
+    out.push('  <tbody>');
+    for (let i = startIdx; i < rows.length; i++) out.push(tr(rows[i], 'td'));
+    out.push('  </tbody>', '</table>');
+    return out.join('\n');
+  }
+
+  // Sortie Markdown : colonnes alignées pour rester lisible en texte brut.
+  function buildMarkdown(rows, hasHeader) {
+    if (!rows.length) return '';
+    const cell = c => String(c).replace(/\|/g, '\\|');           // un | casserait la colonne
+    const width = s => Array.from(s).length;                      // compte les code points
+    const body = rows.map(r => r.map(cell));
+    const header = hasHeader ? body[0] : body[0].map(() => '');
+    const data = hasHeader ? body.slice(1) : body;
+    const cols = header.length;
+    const w = [];
+    for (let c = 0; c < cols; c++) {
+      w[c] = Math.max(3, width(header[c] || ''), ...data.map(r => width(r[c] || '')));
+    }
+    const line = cells => '| ' + cells.map((c, i) => c + ' '.repeat(w[i] - width(c))).join(' | ') + ' |';
+    const out = [line(header), '| ' + w.map(n => '-'.repeat(n)).join(' | ') + ' |'];
+    data.forEach(r => out.push(line(r)));
+    return out.join('\n');
+  }
+
+  // Sortie liste : une ligne par enregistrement, cellules séparées par des virgules.
+  function buildList(rows) {
+    return rows.map(r => r.join(', ')).join('\n');
+  }
+
+  // Sortie CSV (RFC 4180) : guillemets doublés, champ encadré dès qu'il est ambigu.
+  function buildCsv(rows, sep) {
+    const q = c => {
+      const s = String(c);
+      return (s.includes(sep) || s.includes('"') || /[\r\n]/.test(s) || s !== s.trim())
+        ? '"' + s.replace(/"/g, '""') + '"'
+        : s;
+    };
+    return rows.map(r => r.map(q).join(sep)).join('\n');
+  }
+  // ─── FIN GÉNÉRATEURS ──────────────────────────────────────────────────────
+
+  const FORMAT_LABELS = {
+    tsv: 'texte tabulé',
+    boxed: 'tableau encadré'
+  };
+
+  const CSV_SEPARATORS = { comma: ',', semicolon: ';', tab: '\t' };
+
+  // Par sortie : libellé du bouton, et options du haut qui la concernent.
+  const OUTPUTS = {
+    gmail:    { copy: 'Copier pour Gmail', opts: ['hasHeader', 'bordered', 'zebra'] },
+    html:     { copy: 'Copier le HTML',    opts: ['hasHeader'] },
+    markdown: { copy: 'Copier le Markdown', opts: ['hasHeader'] },
+    list:     { copy: 'Copier la liste',   opts: [] },
+    csv:      { copy: 'Copier le CSV',     opts: [] }
+  };
+
+  let current = 'gmail';
+  const outputs = {};   // texte brut de chaque sortie, recalculé à chaque rendu
+
   function render() {
-    const html = buildTable();
-    preview.innerHTML = html;
-    htmlSource.textContent = html;
+    const parsed = parseInput(src.value, format.value);
+    detected.textContent = format.value === 'auto' && parsed.rows.length
+      ? 'détecté : ' + FORMAT_LABELS[parsed.format]
+      : '';
+    const rows = parsed.rows;
+    const o = {
+      hasHeader: hasHeader.checked && rows.length > 0,
+      bordered: bordered.checked,
+      zebra: zebra.checked
+    };
+
+    const gmailHtml = buildGmail(rows, o);
+    preview.innerHTML = gmailHtml;
+    htmlSource.textContent = gmailHtml;
+
+    outputs.gmail = gmailHtml;
+    outputs.html = buildCleanHtml(rows, o.hasHeader);
+    outputs.markdown = buildMarkdown(rows, o.hasHeader);
+    outputs.list = buildList(rows);
+    outputs.csv = buildCsv(rows, CSV_SEPARATORS[csvSep.value]);
+
+    ['html', 'markdown', 'list', 'csv'].forEach(k => {
+      document.getElementById('out-' + k).textContent = outputs[k];
+    });
+
+    // N'afficher que les options qui agissent sur la sortie courante
+    const active = OUTPUTS[current].opts;
+    optLabels.forEach(l => { l.style.display = active.includes(l.dataset.opt) ? '' : 'none'; });
+    copyBtn.textContent = OUTPUTS[current].copy;
+
     status.textContent = '';
     status.className = '';
   }
+
+  // Onglets : bascule, ARIA et navigation clavier (comme le plugin Bootstrap)
+  function selectTab(btn) {
+    tabs.forEach(b => {
+      const on = b === btn;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      b.tabIndex = on ? 0 : -1;
+      document.querySelector(b.dataset.bsTarget).classList.toggle('active', on);
+    });
+    current = btn.dataset.output;
+    render();
+  }
+
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => selectTab(btn));
+    btn.addEventListener('keydown', e => {
+      const i = tabs.indexOf(btn);
+      let next = null;
+      if (e.key === 'ArrowRight') next = tabs[(i + 1) % tabs.length];
+      else if (e.key === 'ArrowLeft') next = tabs[(i - 1 + tabs.length) % tabs.length];
+      else if (e.key === 'Home') next = tabs[0];
+      else if (e.key === 'End') next = tabs[tabs.length - 1];
+      if (next) { e.preventDefault(); selectTab(next); next.focus(); }
+    });
+  });
 
   src.addEventListener('input', render);
   format.addEventListener('change', render);
   hasHeader.addEventListener('change', render);
   bordered.addEventListener('change', render);
   zebra.addEventListener('change', render);
+  csvSep.addEventListener('change', render);
+
+  // Copie texte brut, pour toutes les sorties sauf Gmail
+  async function copyPlain(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const ta = document.createElement('textarea');   // fallback execCommand
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+
+  // Copie le tableau rendu (text/html + repli texte), pour coller dans Gmail
+  async function copyRich(html) {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([preview.innerText], { type: 'text/plain' })
+      })]);
+      return;
+    }
+    const range = document.createRange();            // fallback : sélection + execCommand
+    range.selectNodeContents(preview);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.execCommand('copy');
+    sel.removeAllRanges();
+  }
 
   copyBtn.addEventListener('click', async () => {
-    const html = buildTable();
-    if (!html) {
+    const content = outputs[current];
+    if (!content) {
       status.textContent = 'Rien à copier — colle un tableau d\'abord.';
       status.className = 'error';
       return;
     }
-    const plain = preview.innerText;
     try {
-      if (navigator.clipboard && window.ClipboardItem) {
-        await navigator.clipboard.write([new ClipboardItem({
-          'text/html': new Blob([html], { type: 'text/html' }),
-          'text/plain': new Blob([plain], { type: 'text/plain' })
-        })]);
+      if (current === 'gmail') {
+        await copyRich(content);
+        status.textContent = '✓ Copié — colle directement dans Gmail (Ctrl+V)';
       } else {
-        // Fallback : sélection + execCommand
-        const range = document.createRange();
-        range.selectNodeContents(preview);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        document.execCommand('copy');
-        sel.removeAllRanges();
+        await copyPlain(content);
+        status.textContent = '✓ Copié — ' + OUTPUTS[current].copy.replace('Copier ', '') + ' dans le presse-papier';
       }
-      status.textContent = '✓ Copié — colle directement dans Gmail (Ctrl+V)';
       status.className = 'success';
     } catch (e) {
       status.textContent = 'Erreur de copie : ' + e.message;
