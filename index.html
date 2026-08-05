@@ -542,6 +542,18 @@
     });
   });
 
+  // L'exemple pré-rempli s'efface dès qu'on entre dans le champ, une seule fois
+  // et seulement s'il est resté intact (le navigateur peut restaurer une saisie
+  // au rechargement : on ne l'écrase pas).
+  let exampleCleared = false;
+  src.addEventListener('focus', () => {
+    if (!exampleCleared && src.value === src.defaultValue) {
+      src.value = '';
+      render();
+    }
+    exampleCleared = true;
+  });
+
   src.addEventListener('input', render);
   format.addEventListener('change', render);
   hasHeader.addEventListener('change', render);
