@@ -213,6 +213,19 @@
     color: var(--text-muted);
     font-weight: 500;
   }
+  footer {
+    margin-top: 2.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  footer p { margin: 0 0 6px; }
+  footer p:last-child { margin-bottom: 0; }
+  footer strong { color: var(--text); font-weight: 500; }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
   details pre {
     background: var(--bg);
     border: 1px solid var(--border);
@@ -299,6 +312,11 @@
 </div>
 
 <div id="status"></div>
+
+<footer>
+  <p><strong>Confidentialité</strong> — Tout se passe dans ton navigateur. Le tableau que tu colles n'est jamais envoyé sur un serveur : il n'est ni enregistré, ni analysé, ni transmis à qui que ce soit. Pas de compte, pas de cookie, pas de traceur, aucune ressource externe chargée. Ferme l'onglet, il n'en reste rien. Seuls les journaux d'accès techniques du serveur web, habituels à tout hébergement, enregistrent la consultation de la page elle-même.</p>
+  <p>Édité par <a href="https://www.italic.fr" target="_blank" rel="noopener">Italic — www.italic.fr</a></p>
+</footer>
 
 <script>
 (function() {
