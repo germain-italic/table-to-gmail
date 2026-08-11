@@ -372,17 +372,41 @@
       .map(c => c.trim());
   }
 
+  // Recolle les lignes physiques d'une même ligne logique : une cellule trop
+  // longue est repliée sur les lignes suivantes, les autres colonnes y sont
+  // vides. On rejoint colonne par colonne, en sautant les vides.
+  function mergeWrapped(block) {
+    if (block.length === 1) return block[0];
+    const cols = block.reduce((m, r) => Math.max(m, r.length), 0);
+    const row = [];
+    for (let c = 0; c < cols; c++) {
+      row.push(block.map(r => r[c] || '').filter(s => s).join(' '));
+    }
+    return row;
+  }
+
   // Tableaux encadrés : box-drawing Unicode (Claude Code), ASCII (+--+) ou Markdown.
-  // Une ligne de contenu = une ligne du tableau ; le texte hors tableau est ignoré.
+  // Le texte hors tableau est ignoré.
+  // Les séparateurs découpent le contenu en blocs. Le tableau lève lui-même
+  // l'ambiguïté du repli : dès qu'il trace un filet entre chacune de ses lignes
+  // (≥ 3 blocs), un bloc de plusieurs lignes est forcément une cellule repliée,
+  // à recoller. Sinon — Markdown, ou tableau à simple filet d'en-tête — les
+  // lignes ne sont pas séparées entre elles et chacune est une ligne du tableau.
   function parseBoxed(text) {
     const chars = verticalChars(text);
     const vert = new RegExp('[' + chars + ']');
-    const rows = [];
+    const blocks = [];
+    let block = [];
     text.split(/\r?\n/).forEach(line => {
-      if (!line.trim() || isSeparatorLine(line) || !vert.test(line)) return;
-      rows.push(splitCells(line, chars));
+      if (isSeparatorLine(line)) {
+        if (block.length) { blocks.push(block); block = []; }
+        return;
+      }
+      if (!line.trim() || !vert.test(line)) return;
+      block.push(splitCells(line, chars));
     });
-    return rows;
+    if (block.length) blocks.push(block);
+    return blocks.length >= 3 ? blocks.map(mergeWrapped) : blocks.flat();
   }
 
   function parseTsv(text) {
