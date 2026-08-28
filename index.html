@@ -409,8 +409,33 @@
     return blocks.length >= 3 ? blocks.map(mergeWrapped) : blocks.flat();
   }
 
+  // Un <br> dans une cellule (les en-têtes des tableaux d'intranet en sont
+  // pleins) devient un retour à la ligne au moment du collage : la ligne logique
+  // se casse en plusieurs lignes physiques, la fin de la cellule repartant en
+  // tête de la suivante. On recolle tant que le total des champs tient dans la
+  // largeur du tableau. Au-delà, les deux lignes sont bien distinctes et la
+  // première est seulement plus courte — dernière colonne vide, sans tabulation
+  // finale, ce que produisent couramment les exports.
+  function mergeSplitLines(rows) {
+    const cols = rows.reduce((m, r) => Math.max(m, r.length), 0);
+    if (cols < 3) return rows;
+    const out = [];
+    rows.forEach(cells => {
+      const prev = out[out.length - 1];
+      if (prev && prev.length + cells.length - 1 <= cols) {
+        prev[prev.length - 1] = [prev[prev.length - 1], cells[0]]
+          .filter(s => s.trim()).join(' ');
+        for (let i = 1; i < cells.length; i++) prev.push(cells[i]);
+      } else {
+        out.push(cells);
+      }
+    });
+    return out;
+  }
+
   function parseTsv(text) {
-    return text.split(/\r?\n/).filter(l => l.length > 0).map(l => l.split('\t'));
+    const rows = text.split(/\r?\n/).filter(l => l.length > 0).map(l => l.split('\t'));
+    return mergeSplitLines(rows);
   }
 
   function detectFormat(text) {
