@@ -1,0 +1,3 @@
+# Serveur local lancé par manage.sh
+.serve.pid
+.serve.log
