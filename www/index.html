@@ -223,8 +223,20 @@
   #preview table, #previewHtml table {
     margin: 0;
   }
-  /* Le HTML propre n'a aucun style : son aperçu doit donc rester nu lui aussi,
-     c'est tout l'intérêt. On l'annonce, pour qu'il ne passe pas pour cassé. */
+  /* Le HTML propre ne porte aucun style : sans un filet de lecture, son aperçu
+     serait un bloc de texte informe. Ces bordures appartiennent à la page et
+     non au code copié ; la note sous l'onglet le précise. */
+  #previewHtml table {
+    border-collapse: collapse;
+  }
+  #previewHtml th, #previewHtml td {
+    border: 1px solid var(--border);
+    padding: 5px 9px;
+    text-align: left;
+  }
+  #previewHtml th {
+    background: var(--surface);
+  }
   .bare-note {
     font-size: 12px;
     color: var(--text-muted);
@@ -232,7 +244,7 @@
     margin: 0 0 10px;
   }
   /* Poignées de suppression : boutons nus dans la gouttière de l'aperçu.
-     Discrètes au repos, franches au survol — elles ne doivent pas concurrencer
+     Discrètes au repos, franches au survol : elles ne doivent pas concurrencer
      le tableau, qui est ce qu'on vient regarder. */
   #preview button.drop {
     margin: 0;
@@ -396,7 +408,7 @@
     </details>
   </div>
   <div class="tab-pane" id="pane-html" role="tabpanel" aria-labelledby="tab-html" tabindex="0">
-    <p class="bare-note" data-i18n="bareNote">Aperçu sans style : la mise en forme viendra de la CSS de la page de destination.</p>
+    <p class="bare-note" data-i18n="bareNote">Les bordures de cet aperçu servent à la lecture : le HTML copié ne porte aucun style, sa mise en forme viendra de la CSS de la page de destination.</p>
     <div id="previewHtml"></div>
     <details>
       <summary data-i18n="htmlSourceSummary">Voir le code HTML source</summary>
@@ -427,8 +439,8 @@
 <div id="clipHtml" aria-hidden="true"></div>
 
 <footer>
-  <p data-i18n="privacy"><strong>Confidentialité</strong> — Tout se passe dans votre navigateur. Le tableau que vous collez n'est jamais envoyé sur un serveur : il n'est ni enregistré, ni analysé, ni transmis à qui que ce soit. Pas de compte, pas de cookie, pas de traceur, aucune ressource externe chargée — seule votre langue d'affichage est retenue dans le navigateur. Fermez l'onglet, il n'en reste rien. Seuls les journaux d'accès techniques du serveur web, habituels à tout hébergement, enregistrent la consultation de la page elle-même.</p>
-  <p data-i18n="editor">Édité par <a href="https://www.italic.fr" target="_blank" rel="noopener">Italic — www.italic.fr</a></p>
+  <p data-i18n="privacy"><strong>Confidentialité.</strong> Tout se passe dans votre navigateur. Le tableau que vous collez n'est jamais envoyé sur un serveur : il n'est ni enregistré, ni analysé, ni transmis à qui que ce soit. Pas de compte, pas de cookie, pas de traceur, aucune ressource externe chargée ; seule votre langue d'affichage est retenue dans le navigateur. Fermez l'onglet, il n'en reste rien. Seuls les journaux d'accès techniques du serveur web, habituels à tout hébergement, enregistrent la consultation de la page elle-même.</p>
+  <p data-i18n="editor">Édité par <a href="https://www.italic.fr" target="_blank" rel="noopener">Italic, www.italic.fr</a></p>
 </footer>
 
 <script>
@@ -508,7 +520,7 @@
   // Les séparateurs découpent le contenu en blocs. Le tableau lève lui-même
   // l'ambiguïté du repli : dès qu'il trace un filet entre chacune de ses lignes
   // (≥ 3 blocs), un bloc de plusieurs lignes est forcément une cellule repliée,
-  // à recoller. Sinon — Markdown, ou tableau à simple filet d'en-tête — les
+  // à recoller. Sinon (Markdown, ou tableau à simple filet d'en-tête), les
   // lignes ne sont pas séparées entre elles et chacune est une ligne du tableau.
   function parseBoxed(text) {
     const chars = verticalChars(text);
@@ -532,7 +544,7 @@
   // se casse en plusieurs lignes physiques, la fin de la cellule repartant en
   // tête de la suivante. On recolle tant que le total des champs tient dans la
   // largeur du tableau. Au-delà, les deux lignes sont bien distinctes et la
-  // première est seulement plus courte — dernière colonne vide, sans tabulation
+  // première est seulement plus courte : dernière colonne vide, sans tabulation
   // finale, ce que produisent couramment les exports.
   function mergeSplitLines(rows) {
     const cols = rows.reduce((m, r) => Math.max(m, r.length), 0);
@@ -623,7 +635,7 @@
     return html + '</tbody></table>';
   }
 
-  // Aperçu interactif : le tableau entier — retiré ou non — flanqué d'une
+  // Aperçu interactif : le tableau entier, retiré ou non, flanqué d'une
   // gouttière de croix, une par ligne et une par colonne. Gmail ne sait pas
   // supprimer une ligne ni une colonne une fois le tableau collé ; on le fait
   // donc ici, avant. Ce qui est retiré reste affiché, barré et grisé, avec une
@@ -717,8 +729,8 @@
   // ─── LANGUES ──────────────────────────────────────────────────────────────
   // Deux langues, un dictionnaire. Le HTML porte la version française : c'est
   // ce que verra un visiteur sans JavaScript. Au chargement, la langue du
-  // navigateur décide — français s'il le demande, anglais pour tout le reste —
-  // et le choix explicite du visiteur, lui, est retenu.
+  // navigateur décide : français s'il le demande, anglais pour tout le reste ;
+  // le choix explicite du visiteur, lui, est retenu.
   const I18N = {
     fr: {
       pageTitle: 'Convertisseur de tableaux',
@@ -735,14 +747,14 @@
       outputLabel: 'Sortie',
       tabHtml: 'HTML propre',
       tabList: 'Liste',
-      bareNote: 'Aperçu sans style : la mise en forme viendra de la CSS de la page de destination.',
+      bareNote: 'Les bordures de cet aperçu servent à la lecture : le HTML copié ne porte aucun style, sa mise en forme viendra de la CSS de la page de destination.',
       htmlSourceSummary: 'Voir le code HTML source',
       csvSepLabel: 'Séparateur',
       csvComma: 'Virgule , (standard)',
       csvSemicolon: 'Point-virgule ; (Excel FR)',
       csvTab: 'Tabulation',
-      privacy: "<strong>Confidentialité</strong> — Tout se passe dans votre navigateur. Le tableau que vous collez n'est jamais envoyé sur un serveur : il n'est ni enregistré, ni analysé, ni transmis à qui que ce soit. Pas de compte, pas de cookie, pas de traceur, aucune ressource externe chargée — seule votre langue d'affichage est retenue dans le navigateur. Fermez l'onglet, il n'en reste rien. Seuls les journaux d'accès techniques du serveur web, habituels à tout hébergement, enregistrent la consultation de la page elle-même.",
-      editor: 'Édité par <a href="https://www.italic.fr" target="_blank" rel="noopener">Italic — www.italic.fr</a>',
+      privacy: "<strong>Confidentialité.</strong> Tout se passe dans votre navigateur. Le tableau que vous collez n'est jamais envoyé sur un serveur : il n'est ni enregistré, ni analysé, ni transmis à qui que ce soit. Pas de compte, pas de cookie, pas de traceur, aucune ressource externe chargée ; seule votre langue d'affichage est retenue dans le navigateur. Fermez l'onglet, il n'en reste rien. Seuls les journaux d'accès techniques du serveur web, habituels à tout hébergement, enregistrent la consultation de la page elle-même.",
+      editor: 'Édité par <a href="https://www.italic.fr" target="_blank" rel="noopener">Italic, www.italic.fr</a>',
       detectedPrefix: 'détecté : ',
       format: { tsv: 'texte tabulé', boxed: 'tableau encadré' },
       copy: {
@@ -752,16 +764,16 @@
         list: 'Copier la liste',
         csv: 'Copier le CSV'
       },
-      dropHint: "— cliquez sur les × de l'aperçu pour retirer une ligne ou une colonne",
+      dropHint: "(cliquez sur les × de l'aperçu pour retirer une ligne ou une colonne)",
       restoreAll: 'tout rétablir',
       column: 'colonne', columns: 'colonnes',
       row: 'ligne', rows: 'lignes',
       removedOne: ' retirée', removedMany: ' retirées',
       removeCol: 'Retirer la colonne %', restoreCol: 'Rétablir la colonne %',
       removeRow: 'Retirer la ligne %', restoreRow: 'Rétablir la ligne %',
-      copiedGmail: '✓ Copié — collez directement dans Gmail (Ctrl+V)',
+      copiedGmail: '✓ Copié : collez directement dans Gmail (Ctrl+V)',
       copiedPlain: '✓ Copié dans le presse-papier',
-      nothingToCopy: "Rien à copier — collez d'abord un tableau.",
+      nothingToCopy: "Rien à copier : collez d'abord un tableau.",
       copyError: 'Erreur de copie : '
     },
     en: {
@@ -779,14 +791,14 @@
       outputLabel: 'Output',
       tabHtml: 'Clean HTML',
       tabList: 'List',
-      bareNote: 'Unstyled preview: the formatting will come from the CSS of the destination page.',
+      bareNote: 'The borders in this preview are there to help you read it: the copied HTML carries no style, its formatting will come from the CSS of the destination page.',
       htmlSourceSummary: 'View the HTML source',
       csvSepLabel: 'Separator',
       csvComma: 'Comma , (standard)',
       csvSemicolon: 'Semicolon ; (French Excel)',
       csvTab: 'Tab',
-      privacy: '<strong>Privacy</strong> — Everything happens in your browser. The table you paste is never sent to a server: it is not stored, not analysed, not passed on to anyone. No account, no cookie, no tracker, no external resource loaded — only your display language is remembered in the browser. Close the tab and nothing is left of it. Only the web server\'s technical access logs, the ones any hosting keeps, record that the page itself was visited.',
-      editor: 'Published by <a href="https://www.italic.fr" target="_blank" rel="noopener">Italic — www.italic.fr</a>',
+      privacy: '<strong>Privacy.</strong> Everything happens in your browser. The table you paste is never sent to a server: it is not stored, not analysed, not passed on to anyone. No account, no cookie, no tracker, no external resource loaded; only your display language is remembered in the browser. Close the tab and nothing is left of it. Only the web server\'s technical access logs, the ones any hosting keeps, record that the page itself was visited.',
+      editor: 'Published by <a href="https://www.italic.fr" target="_blank" rel="noopener">Italic, www.italic.fr</a>',
       detectedPrefix: 'detected: ',
       format: { tsv: 'tab-separated text', boxed: 'boxed table' },
       copy: {
@@ -796,16 +808,16 @@
         list: 'Copy the list',
         csv: 'Copy the CSV'
       },
-      dropHint: '— click the × in the preview to remove a row or a column',
+      dropHint: '(click the × in the preview to remove a row or a column)',
       restoreAll: 'restore all',
       column: 'column', columns: 'columns',
       row: 'row', rows: 'rows',
       removedOne: ' removed', removedMany: ' removed',
       removeCol: 'Remove column %', restoreCol: 'Restore column %',
       removeRow: 'Remove row %', restoreRow: 'Restore row %',
-      copiedGmail: '✓ Copied — paste straight into Gmail (Ctrl+V)',
+      copiedGmail: '✓ Copied: paste straight into Gmail (Ctrl+V)',
       copiedPlain: '✓ Copied to the clipboard',
-      nothingToCopy: 'Nothing to copy — paste a table first.',
+      nothingToCopy: 'Nothing to copy: paste a table first.',
       copyError: 'Copy failed: '
     }
   };
