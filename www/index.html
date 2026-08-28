@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tableau → Gmail</title>
+<title>Convertisseur de tableaux</title>
 <style>
   :root {
     --bg: #ffffff;
@@ -32,6 +32,37 @@
     font-weight: 500;
     margin: 0 0 0.5rem;
   }
+  .page-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .lang-switch {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .lang-switch button {
+    margin: 0;
+    padding: 3px 9px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  .lang-switch button:hover {
+    background: var(--surface);
+    color: var(--text);
+  }
+  .lang-switch button[aria-pressed="true"] {
+    color: #ffffff;
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .lang-switch button:active { transform: none; }
   p.intro {
     color: var(--text-muted);
     margin: 0 0 1.5rem;
@@ -310,40 +341,46 @@
 </head>
 <body>
 
-<h1>Tableau → Gmail</h1>
-<p class="intro">Colle un texte tabulé (copié depuis Excel, un export, etc.) ou un tableau encadré (généré par Claude Code, Markdown, ASCII). Choisis la sortie voulue dans les onglets, puis copie : la sortie Gmail arrive <em>rendue</em> dans le presse-papier (Ctrl+V dans Gmail), les autres en texte brut.</p>
+<header class="page-head">
+  <h1 data-i18n="pageTitle">Convertisseur de tableaux</h1>
+  <div class="lang-switch" role="group" aria-label="Langue / Language">
+    <button type="button" class="lang" data-lang="fr" aria-pressed="true">FR</button>
+    <button type="button" class="lang" data-lang="en" aria-pressed="false">EN</button>
+  </div>
+</header>
+<p class="intro" data-i18n="intro">Collez un texte tabulé (copié depuis Excel, un export, etc.) ou un tableau encadré (généré par Claude Code, Markdown, ASCII). Choisissez la sortie voulue dans les onglets, puis copiez : la sortie Gmail arrive <em>rendue</em> dans le presse-papier (Ctrl+V dans Gmail), les autres en texte brut.</p>
 
-<label for="src">Tableau en entrée <span id="detected"></span></label>
-<textarea id="src" spellcheck="false" placeholder="Colle ici un tableau tabulé ou encadré…">Date	J	Compte	Libellé	Référence	Débit	Crédit	L
+<label for="src"><span data-i18n="inputLabel">Tableau en entrée</span> <span id="detected"></span></label>
+<textarea id="src" spellcheck="false" data-i18n-attr="placeholder:placeholder" placeholder="Collez ici un tableau tabulé ou encadré…">Date	J	Compte	Libellé	Référence	Débit	Crédit	L
 31/03/2025	ACHA	60701	FACTURE-2025-000124 IMPUTATION DEVIS 4345	2025-000124	350,00	0	
 17/03/2025	ACHA	60701	F-2025-000119 IMPUTATION DEVIS 4345	20250724065712	315,00	0</textarea>
 
 <div class="controls">
-  <select id="format" aria-label="Format d'entrée">
-    <option value="auto">Format : auto</option>
-    <option value="tsv">Texte tabulé</option>
-    <option value="boxed">Tableau encadré</option>
+  <select id="format" data-i18n-attr="aria-label:formatAria" aria-label="Format d'entrée">
+    <option value="auto" data-i18n="formatAuto">Format : auto</option>
+    <option value="tsv" data-i18n="formatTsv">Texte tabulé</option>
+    <option value="boxed" data-i18n="formatBoxed">Tableau encadré</option>
   </select>
-  <label class="opt" data-opt="hasHeader"><input type="checkbox" id="hasHeader" checked> Première ligne = en-tête</label>
-  <label class="opt" data-opt="bordered"><input type="checkbox" id="bordered" checked> Bordures</label>
-  <label class="opt" data-opt="zebra"><input type="checkbox" id="zebra"> Lignes alternées</label>
+  <label class="opt" data-opt="hasHeader"><input type="checkbox" id="hasHeader" checked> <span data-i18n="optHeader">Première ligne = en-tête</span></label>
+  <label class="opt" data-opt="bordered"><input type="checkbox" id="bordered" checked> <span data-i18n="optBordered">Bordures</span></label>
+  <label class="opt" data-opt="zebra"><input type="checkbox" id="zebra"> <span data-i18n="optZebra">Lignes alternées</span></label>
   <button id="copyBtn" type="button">Copier le tableau</button>
 </div>
 
-<div class="preview-label">Sortie <span id="dropInfo"></span></div>
+<div class="preview-label"><span data-i18n="outputLabel">Sortie</span> <span id="dropInfo"></span></div>
 
 <ul class="nav nav-tabs" id="outputTabs" role="tablist">
   <li class="nav-item" role="presentation">
     <button class="nav-link active" id="tab-gmail" data-bs-target="#pane-gmail" data-output="gmail" type="button" role="tab" aria-controls="pane-gmail" aria-selected="true">Gmail</button>
   </li>
   <li class="nav-item" role="presentation">
-    <button class="nav-link" id="tab-html" data-bs-target="#pane-html" data-output="html" type="button" role="tab" aria-controls="pane-html" aria-selected="false" tabindex="-1">HTML propre</button>
+    <button class="nav-link" id="tab-html" data-bs-target="#pane-html" data-output="html" type="button" role="tab" aria-controls="pane-html" aria-selected="false" tabindex="-1" data-i18n="tabHtml">HTML propre</button>
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-markdown" data-bs-target="#pane-markdown" data-output="markdown" type="button" role="tab" aria-controls="pane-markdown" aria-selected="false" tabindex="-1">Markdown</button>
   </li>
   <li class="nav-item" role="presentation">
-    <button class="nav-link" id="tab-list" data-bs-target="#pane-list" data-output="list" type="button" role="tab" aria-controls="pane-list" aria-selected="false" tabindex="-1">Liste</button>
+    <button class="nav-link" id="tab-list" data-bs-target="#pane-list" data-output="list" type="button" role="tab" aria-controls="pane-list" aria-selected="false" tabindex="-1" data-i18n="tabList">Liste</button>
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="tab-csv" data-bs-target="#pane-csv" data-output="csv" type="button" role="tab" aria-controls="pane-csv" aria-selected="false" tabindex="-1">CSV</button>
@@ -354,15 +391,15 @@
   <div class="tab-pane active" id="pane-gmail" role="tabpanel" aria-labelledby="tab-gmail" tabindex="0">
     <div id="preview"></div>
     <details>
-      <summary>Voir le code HTML source</summary>
+      <summary data-i18n="htmlSourceSummary">Voir le code HTML source</summary>
       <pre id="htmlSource"></pre>
     </details>
   </div>
   <div class="tab-pane" id="pane-html" role="tabpanel" aria-labelledby="tab-html" tabindex="0">
-    <p class="bare-note">Aperçu sans style : la mise en forme viendra de la CSS de la page de destination.</p>
+    <p class="bare-note" data-i18n="bareNote">Aperçu sans style : la mise en forme viendra de la CSS de la page de destination.</p>
     <div id="previewHtml"></div>
     <details>
-      <summary>Voir le code HTML source</summary>
+      <summary data-i18n="htmlSourceSummary">Voir le code HTML source</summary>
       <pre id="htmlCleanSource"></pre>
     </details>
   </div>
@@ -374,11 +411,11 @@
   </div>
   <div class="tab-pane" id="pane-csv" role="tabpanel" aria-labelledby="tab-csv" tabindex="0">
     <div class="pane-toolbar">
-      <label for="csvSep">Séparateur</label>
+      <label for="csvSep" data-i18n="csvSepLabel">Séparateur</label>
       <select id="csvSep">
-        <option value="comma">Virgule , (standard)</option>
-        <option value="semicolon">Point-virgule ; (Excel FR)</option>
-        <option value="tab">Tabulation</option>
+        <option value="comma" data-i18n="csvComma">Virgule , (standard)</option>
+        <option value="semicolon" data-i18n="csvSemicolon">Point-virgule ; (Excel FR)</option>
+        <option value="tab" data-i18n="csvTab">Tabulation</option>
       </select>
     </div>
     <pre class="out" id="out-csv"></pre>
@@ -390,8 +427,8 @@
 <div id="clipHtml" aria-hidden="true"></div>
 
 <footer>
-  <p><strong>Confidentialité</strong> — Tout se passe dans ton navigateur. Le tableau que tu colles n'est jamais envoyé sur un serveur : il n'est ni enregistré, ni analysé, ni transmis à qui que ce soit. Pas de compte, pas de cookie, pas de traceur, aucune ressource externe chargée. Ferme l'onglet, il n'en reste rien. Seuls les journaux d'accès techniques du serveur web, habituels à tout hébergement, enregistrent la consultation de la page elle-même.</p>
-  <p>Édité par <a href="https://www.italic.fr" target="_blank" rel="noopener">Italic — www.italic.fr</a></p>
+  <p data-i18n="privacy"><strong>Confidentialité</strong> — Tout se passe dans votre navigateur. Le tableau que vous collez n'est jamais envoyé sur un serveur : il n'est ni enregistré, ni analysé, ni transmis à qui que ce soit. Pas de compte, pas de cookie, pas de traceur, aucune ressource externe chargée — seule votre langue d'affichage est retenue dans le navigateur. Fermez l'onglet, il n'en reste rien. Seuls les journaux d'accès techniques du serveur web, habituels à tout hébergement, enregistrent la consultation de la page elle-même.</p>
+  <p data-i18n="editor">Édité par <a href="https://www.italic.fr" target="_blank" rel="noopener">Italic — www.italic.fr</a></p>
 </footer>
 
 <script>
@@ -412,6 +449,7 @@
   const dropInfo = document.getElementById('dropInfo');
   const clipHtml = document.getElementById('clipHtml');
   const tabs = [...document.querySelectorAll('#outputTabs .nav-link')];
+  const langBtns = [...document.querySelectorAll('.lang-switch button')];
   const optLabels = [...document.querySelectorAll('.controls label.opt')];
 
   function esc(s) {
@@ -590,7 +628,7 @@
   // supprimer une ligne ni une colonne une fois le tableau collé ; on le fait
   // donc ici, avant. Ce qui est retiré reste affiché, barré et grisé, avec une
   // flèche pour le rétablir : la suppression n'engage à rien.
-  function buildPreview(rows, o, dropped) {
+  function buildPreview(rows, o, dropped, t) {
     if (!rows.length) return '';
     const s = gmailStyles(o);
     const cols = rows[0].length;
@@ -598,10 +636,11 @@
     const struck = ' color: #b0b0b0; text-decoration: line-through;';
     const kept = rows.map((r, i) => i).filter(i => !dropped.rows.has(i));
     const headerIdx = o.hasHeader ? kept[0] : -1;
+    const title = (kind, i, gone) =>
+      t[(gone ? 'restore' : 'remove') + (kind === 'col' ? 'Col' : 'Row')].replace('%', i + 1);
     const btn = (kind, i, gone) =>
       '<td style="' + gutter + '"><button type="button" class="drop' + (gone ? ' back' : '') +
-      '" data-' + kind + '="' + i + '" title="' + (gone ? 'Rétablir' : 'Retirer') +
-      (kind === 'col' ? ' la colonne ' : ' la ligne ') + (i + 1) + '">' +
+      '" data-' + kind + '="' + i + '" title="' + esc(title(kind, i, gone)) + '">' +
       (gone ? '↩' : '×') + '</button></td>';
 
     let html = '<table style="' + s.table + '"><tr><td style="' + gutter + '"></td>';
@@ -675,20 +714,147 @@
   }
   // ─── FIN GÉNÉRATEURS ──────────────────────────────────────────────────────
 
-  const FORMAT_LABELS = {
-    tsv: 'texte tabulé',
-    boxed: 'tableau encadré'
+  // ─── LANGUES ──────────────────────────────────────────────────────────────
+  // Deux langues, un dictionnaire. Le HTML porte la version française : c'est
+  // ce que verra un visiteur sans JavaScript. Au chargement, la langue du
+  // navigateur décide — français s'il le demande, anglais pour tout le reste —
+  // et le choix explicite du visiteur, lui, est retenu.
+  const I18N = {
+    fr: {
+      pageTitle: 'Convertisseur de tableaux',
+      intro: 'Collez un texte tabulé (copié depuis Excel, un export, etc.) ou un tableau encadré (généré par Claude Code, Markdown, ASCII). Choisissez la sortie voulue dans les onglets, puis copiez : la sortie Gmail arrive <em>rendue</em> dans le presse-papier (Ctrl+V dans Gmail), les autres en texte brut.',
+      inputLabel: 'Tableau en entrée',
+      placeholder: 'Collez ici un tableau tabulé ou encadré…',
+      formatAria: "Format d'entrée",
+      formatAuto: 'Format : auto',
+      formatTsv: 'Texte tabulé',
+      formatBoxed: 'Tableau encadré',
+      optHeader: 'Première ligne = en-tête',
+      optBordered: 'Bordures',
+      optZebra: 'Lignes alternées',
+      outputLabel: 'Sortie',
+      tabHtml: 'HTML propre',
+      tabList: 'Liste',
+      bareNote: 'Aperçu sans style : la mise en forme viendra de la CSS de la page de destination.',
+      htmlSourceSummary: 'Voir le code HTML source',
+      csvSepLabel: 'Séparateur',
+      csvComma: 'Virgule , (standard)',
+      csvSemicolon: 'Point-virgule ; (Excel FR)',
+      csvTab: 'Tabulation',
+      privacy: "<strong>Confidentialité</strong> — Tout se passe dans votre navigateur. Le tableau que vous collez n'est jamais envoyé sur un serveur : il n'est ni enregistré, ni analysé, ni transmis à qui que ce soit. Pas de compte, pas de cookie, pas de traceur, aucune ressource externe chargée — seule votre langue d'affichage est retenue dans le navigateur. Fermez l'onglet, il n'en reste rien. Seuls les journaux d'accès techniques du serveur web, habituels à tout hébergement, enregistrent la consultation de la page elle-même.",
+      editor: 'Édité par <a href="https://www.italic.fr" target="_blank" rel="noopener">Italic — www.italic.fr</a>',
+      detectedPrefix: 'détecté : ',
+      format: { tsv: 'texte tabulé', boxed: 'tableau encadré' },
+      copy: {
+        gmail: 'Copier pour Gmail',
+        html: 'Copier le HTML',
+        markdown: 'Copier le Markdown',
+        list: 'Copier la liste',
+        csv: 'Copier le CSV'
+      },
+      dropHint: "— cliquez sur les × de l'aperçu pour retirer une ligne ou une colonne",
+      restoreAll: 'tout rétablir',
+      column: 'colonne', columns: 'colonnes',
+      row: 'ligne', rows: 'lignes',
+      removedOne: ' retirée', removedMany: ' retirées',
+      removeCol: 'Retirer la colonne %', restoreCol: 'Rétablir la colonne %',
+      removeRow: 'Retirer la ligne %', restoreRow: 'Rétablir la ligne %',
+      copiedGmail: '✓ Copié — collez directement dans Gmail (Ctrl+V)',
+      copiedPlain: '✓ Copié dans le presse-papier',
+      nothingToCopy: "Rien à copier — collez d'abord un tableau.",
+      copyError: 'Erreur de copie : '
+    },
+    en: {
+      pageTitle: 'Table converter',
+      intro: 'Paste tab-separated text (copied from Excel, an export, and so on) or a boxed table (produced by Claude Code, Markdown, ASCII). Pick the output you need from the tabs, then copy: the Gmail output reaches the clipboard <em>rendered</em> (Ctrl+V into Gmail), the others as plain text.',
+      inputLabel: 'Input table',
+      placeholder: 'Paste a tab-separated or boxed table here…',
+      formatAria: 'Input format',
+      formatAuto: 'Format: auto',
+      formatTsv: 'Tab-separated text',
+      formatBoxed: 'Boxed table',
+      optHeader: 'First row is a header',
+      optBordered: 'Borders',
+      optZebra: 'Alternating rows',
+      outputLabel: 'Output',
+      tabHtml: 'Clean HTML',
+      tabList: 'List',
+      bareNote: 'Unstyled preview: the formatting will come from the CSS of the destination page.',
+      htmlSourceSummary: 'View the HTML source',
+      csvSepLabel: 'Separator',
+      csvComma: 'Comma , (standard)',
+      csvSemicolon: 'Semicolon ; (French Excel)',
+      csvTab: 'Tab',
+      privacy: '<strong>Privacy</strong> — Everything happens in your browser. The table you paste is never sent to a server: it is not stored, not analysed, not passed on to anyone. No account, no cookie, no tracker, no external resource loaded — only your display language is remembered in the browser. Close the tab and nothing is left of it. Only the web server\'s technical access logs, the ones any hosting keeps, record that the page itself was visited.',
+      editor: 'Published by <a href="https://www.italic.fr" target="_blank" rel="noopener">Italic — www.italic.fr</a>',
+      detectedPrefix: 'detected: ',
+      format: { tsv: 'tab-separated text', boxed: 'boxed table' },
+      copy: {
+        gmail: 'Copy for Gmail',
+        html: 'Copy the HTML',
+        markdown: 'Copy the Markdown',
+        list: 'Copy the list',
+        csv: 'Copy the CSV'
+      },
+      dropHint: '— click the × in the preview to remove a row or a column',
+      restoreAll: 'restore all',
+      column: 'column', columns: 'columns',
+      row: 'row', rows: 'rows',
+      removedOne: ' removed', removedMany: ' removed',
+      removeCol: 'Remove column %', restoreCol: 'Restore column %',
+      removeRow: 'Remove row %', restoreRow: 'Restore row %',
+      copiedGmail: '✓ Copied — paste straight into Gmail (Ctrl+V)',
+      copiedPlain: '✓ Copied to the clipboard',
+      nothingToCopy: 'Nothing to copy — paste a table first.',
+      copyError: 'Copy failed: '
+    }
   };
+
+  const LANG_KEY = 'table-to-gmail:lang';
+
+  // Le choix explicite prime ; sinon la première langue demandée par le
+  // navigateur, l'anglais dès qu'elle n'est pas le français. Le stockage local
+  // peut être fermé (navigation privée, réglages) : ce n'est jamais bloquant.
+  function initialLang() {
+    let saved = null;
+    try { saved = localStorage.getItem(LANG_KEY); } catch (e) { /* indisponible */ }
+    if (saved === 'fr' || saved === 'en') return saved;
+    const list = (navigator.languages && navigator.languages.length)
+      ? navigator.languages : [navigator.language || 'en'];
+    return /^fr/i.test(list[0] || '') ? 'fr' : 'en';
+  }
+
+  let lang = initialLang();
+  const T = () => I18N[lang];
+
+  function applyI18n() {
+    const t = T();
+    document.documentElement.lang = lang;
+    document.title = t.pageTitle;
+    // Le dictionnaire est du contenu statique, jamais une donnée saisie : il
+    // peut donc porter <em> et les liens du pied de page sans danger.
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      el.innerHTML = t[el.dataset.i18n];
+    });
+    document.querySelectorAll('[data-i18n-attr]').forEach(el => {
+      const [attr, key] = el.dataset.i18nAttr.split(':');
+      el.setAttribute(attr, t[key]);
+    });
+    langBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+    render();
+  }
+  // ─── FIN LANGUES ──────────────────────────────────────────────────────────
 
   const CSV_SEPARATORS = { comma: ',', semicolon: ';', tab: '\t' };
 
-  // Par sortie : libellé du bouton, et options du haut qui la concernent.
+  // Par sortie, les options du haut qui la concernent. Le libellé du bouton,
+  // lui, dépend de la langue : il vit dans le dictionnaire.
   const OUTPUTS = {
-    gmail:    { copy: 'Copier pour Gmail', opts: ['hasHeader', 'bordered', 'zebra'] },
-    html:     { copy: 'Copier le HTML',    opts: ['hasHeader'] },
-    markdown: { copy: 'Copier le Markdown', opts: ['hasHeader'] },
-    list:     { copy: 'Copier la liste',   opts: [] },
-    csv:      { copy: 'Copier le CSV',     opts: [] }
+    gmail:    { opts: ['hasHeader', 'bordered', 'zebra'] },
+    html:     { opts: ['hasHeader'] },
+    markdown: { opts: ['hasHeader'] },
+    list:     { opts: [] },
+    csv:      { opts: [] }
   };
 
   let current = 'gmail';
@@ -705,14 +871,15 @@
     dropped.cols.clear();
   }
 
-  function plural(n, mot) {
-    return n + ' ' + mot + (n > 1 ? 's' : '');
+  function plural(n, key) {
+    return n + ' ' + T()[n > 1 ? key + 's' : key];
   }
 
   function render() {
+    const t = T();
     const parsed = parseInput(src.value, format.value);
     detected.textContent = format.value === 'auto' && parsed.rows.length
-      ? 'détecté : ' + FORMAT_LABELS[parsed.format]
+      ? t.detectedPrefix + t.format[parsed.format]
       : '';
     const all = parsed.rows;
     const rows = filterRows(all, dropped);
@@ -723,7 +890,7 @@
     };
 
     const gmailHtml = buildGmail(rows, o);
-    preview.innerHTML = buildPreview(all, o, dropped);
+    preview.innerHTML = buildPreview(all, o, dropped, t);
     clipHtml.innerHTML = gmailHtml;
     htmlSource.textContent = gmailHtml;
     plainFallback = rows.map(r => r.join('\t')).join('\n');
@@ -743,19 +910,20 @@
     // Compteur de suppressions : visible depuis n'importe quel onglet, puisque
     // le retrait vaut pour les cinq sorties, et pas seulement pour l'aperçu.
     const gone = [];
-    if (dropped.cols.size) gone.push(plural(dropped.cols.size, 'colonne'));
-    if (dropped.rows.size) gone.push(plural(dropped.rows.size, 'ligne'));
+    if (dropped.cols.size) gone.push(plural(dropped.cols.size, 'column'));
+    if (dropped.rows.size) gone.push(plural(dropped.rows.size, 'row'));
     const total = dropped.cols.size + dropped.rows.size;
     dropInfo.innerHTML = !all.length ? ''
       : total
-        ? gone.join(' et ') + (total > 1 ? ' retirées' : ' retirée') +
-          ' <button type="button" id="restoreAll">tout rétablir</button>'
-        : '— clique sur les × de l\'aperçu pour retirer une ligne ou une colonne';
+        ? gone.join(lang === 'fr' ? ' et ' : ' and ') +
+          (total > 1 ? t.removedMany : t.removedOne) +
+          ' <button type="button" id="restoreAll">' + t.restoreAll + '</button>'
+        : t.dropHint;
 
     // N'afficher que les options qui agissent sur la sortie courante
     const active = OUTPUTS[current].opts;
     optLabels.forEach(l => { l.style.display = active.includes(l.dataset.opt) ? '' : 'none'; });
-    copyBtn.textContent = OUTPUTS[current].copy;
+    copyBtn.textContent = t.copy[current];
 
     status.textContent = '';
     status.className = '';
@@ -817,6 +985,12 @@
     render();
   });
 
+  langBtns.forEach(btn => btn.addEventListener('click', () => {
+    lang = btn.dataset.lang;
+    try { localStorage.setItem(LANG_KEY, lang); } catch (e) { /* indisponible */ }
+    applyI18n();
+  }));
+
   src.addEventListener('input', () => { resetDropped(); render(); });
   format.addEventListener('change', () => { resetDropped(); render(); });
   hasHeader.addEventListener('change', render);
@@ -859,28 +1033,29 @@
   }
 
   copyBtn.addEventListener('click', async () => {
+    const t = T();
     const content = outputs[current];
     if (!content) {
-      status.textContent = 'Rien à copier — colle un tableau d\'abord.';
+      status.textContent = t.nothingToCopy;
       status.className = 'error';
       return;
     }
     try {
       if (current === 'gmail') {
         await copyRich(content);
-        status.textContent = '✓ Copié — colle directement dans Gmail (Ctrl+V)';
+        status.textContent = t.copiedGmail;
       } else {
         await copyPlain(content);
-        status.textContent = '✓ Copié — ' + OUTPUTS[current].copy.replace('Copier ', '') + ' dans le presse-papier';
+        status.textContent = t.copiedPlain;
       }
       status.className = 'success';
     } catch (e) {
-      status.textContent = 'Erreur de copie : ' + e.message;
+      status.textContent = t.copyError + e.message;
       status.className = 'error';
     }
   });
 
-  render();
+  applyI18n();
 })();
 </script>
 
