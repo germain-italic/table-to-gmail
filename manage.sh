@@ -49,12 +49,47 @@ running_pid() {
     fi
 }
 
+# PID qui écoute sur le port, qu'il vienne de ce script ou non : un serveur
+# lancé à la main dans un autre terminal est le cas le plus fréquent, et le
+# script doit savoir le nommer plutôt que buter dessus.
+listening_pid() {
+    command -v ss >/dev/null 2>&1 || return 0
+    ss -lptn "sport = :$PORT" 2>/dev/null | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2
+}
+
+pid_cmd() {
+    ps -p "$1" -o args= 2>/dev/null
+}
+
+# Une ligne d'état, pour le menu comme pour « status ».
+local_state() {
+    local pid
+    pid="$(running_pid)"
+    if [ -n "$pid" ]; then
+        echo -e "${GREEN}(lancé, PID $pid)${NC}"
+        return
+    fi
+    pid="$(listening_pid)"
+    if [ -n "$pid" ]; then
+        echo -e "${GREEN}(lancé hors de ce script, PID $pid)${NC}"
+    else
+        echo -e "${YELLOW}(arrêté)${NC}"
+    fi
+}
+
 start() {
     local pid
     pid="$(running_pid)"
     if [ -n "$pid" ]; then
         ok "Déjà lancé (PID $pid) : http://localhost:$PORT"
         return 0
+    fi
+    pid="$(listening_pid)"
+    if [ -n "$pid" ]; then
+        fail "Port $PORT déjà pris par le PID $pid, que ce script n'a pas lancé :"
+        echo "  $(pid_cmd "$pid")"
+        info "« stop » sait l'arrêter s'il sert bien la page ; sinon changez de port : PORT=8098 $0 start"
+        return 1
     fi
     python3 -m http.server "$PORT" --bind 127.0.0.1 -d "$DOCROOT" >"$LOG_FILE" 2>&1 &
     echo $! >"$PID_FILE"
@@ -74,8 +109,22 @@ stop() {
     local pid
     pid="$(running_pid)"
     if [ -z "$pid" ]; then
-        info "Aucun serveur lancé par ce script."
-        return 0
+        pid="$(listening_pid)"
+        if [ -z "$pid" ]; then
+            info "Aucun serveur sur le port $PORT."
+            return 0
+        fi
+        # On n'arrête d'office qu'un serveur du même genre que le nôtre. Tout
+        # autre programme qui écouterait là relève d'une décision humaine.
+        local cmd
+        cmd="$(pid_cmd "$pid")"
+        if [[ "$cmd" != *http.server* ]]; then
+            fail "Le port $PORT est tenu par le PID $pid, que ce script n'a pas lancé :"
+            echo "  $cmd"
+            info "Arrêtez-le vous-même si c'est bien ce que vous voulez : kill $pid"
+            return 1
+        fi
+        info "Serveur lancé hors de ce script (PID $pid), arrêt quand même."
     fi
     kill "$pid" 2>/dev/null
     for _ in 1 2 3 4 5; do
@@ -88,13 +137,7 @@ stop() {
 }
 
 status() {
-    local pid
-    pid="$(running_pid)"
-    if [ -n "$pid" ]; then
-        ok "Local   : lancé (PID $pid), http://localhost:$PORT"
-    else
-        info "Local   : arrêté"
-    fi
+    echo -e "${YELLOW}Local   :${NC} $(local_state) http://localhost:$PORT"
 
     local code
     code="$(curl -s -o /dev/null -w '%{http_code}' "$URL" 2>/dev/null)"
@@ -169,13 +212,8 @@ pause() {
 
 show_menu() {
     clear
-    local pid state
-    pid="$(running_pid)"
-    if [ -n "$pid" ]; then
-        state="${GREEN}(lancé, PID $pid)${NC}"
-    else
-        state="${YELLOW}(arrêté)${NC}"
-    fi
+    local state
+    state="$(local_state)"
 
     echo -e "${GREEN}table-to-gmail${NC}  $DOMAIN"
     echo
