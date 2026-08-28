@@ -184,13 +184,21 @@
     min-height: 60px;
     white-space: pre;
   }
-  #preview {
+  #preview, #previewHtml {
     background: var(--bg);
     overflow-x: auto;
     min-height: 60px;
   }
-  #preview table {
+  #preview table, #previewHtml table {
     margin: 0;
+  }
+  /* Le HTML propre n'a aucun style : son aperçu doit donc rester nu lui aussi,
+     c'est tout l'intérêt. On l'annonce, pour qu'il ne passe pas pour cassé. */
+  .bare-note {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin: 0 0 10px;
   }
   /* Poignées de suppression : boutons nus dans la gouttière de l'aperçu.
      Discrètes au repos, franches au survol — elles ne doivent pas concurrencer
@@ -351,7 +359,12 @@
     </details>
   </div>
   <div class="tab-pane" id="pane-html" role="tabpanel" aria-labelledby="tab-html" tabindex="0">
-    <pre class="out" id="out-html"></pre>
+    <p class="bare-note">Aperçu sans style : la mise en forme viendra de la CSS de la page de destination.</p>
+    <div id="previewHtml"></div>
+    <details>
+      <summary>Voir le code HTML source</summary>
+      <pre id="htmlCleanSource"></pre>
+    </details>
   </div>
   <div class="tab-pane" id="pane-markdown" role="tabpanel" aria-labelledby="tab-markdown" tabindex="0">
     <pre class="out" id="out-markdown"></pre>
@@ -386,6 +399,8 @@
   const src = document.getElementById('src');
   const preview = document.getElementById('preview');
   const htmlSource = document.getElementById('htmlSource');
+  const previewHtml = document.getElementById('previewHtml');
+  const htmlCleanSource = document.getElementById('htmlCleanSource');
   const hasHeader = document.getElementById('hasHeader');
   const bordered = document.getElementById('bordered');
   const zebra = document.getElementById('zebra');
@@ -715,11 +730,13 @@
 
     outputs.gmail = gmailHtml;
     outputs.html = buildCleanHtml(rows, o.hasHeader);
+    previewHtml.innerHTML = outputs.html;
+    htmlCleanSource.textContent = outputs.html;
     outputs.markdown = buildMarkdown(rows, o.hasHeader);
     outputs.list = buildList(rows);
     outputs.csv = buildCsv(rows, CSV_SEPARATORS[csvSep.value]);
 
-    ['html', 'markdown', 'list', 'csv'].forEach(k => {
+    ['markdown', 'list', 'csv'].forEach(k => {
       document.getElementById('out-' + k).textContent = outputs[k];
     });
 
