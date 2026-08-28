@@ -105,8 +105,11 @@ status() {
 
     echo
     info "Dernier commit local  : $(git -C "$SCRIPT_DIR" log -1 --oneline)"
+    # --get-last-commit répond comme un « git show » : on en tire le hash court
+    # et le sujet, pour comparer d'un coup d'œil avec le commit local.
     local deployed
-    deployed="$(ssh "$SERVER" "plesk ext git --get-last-commit -domain $DOMAIN -name $REPO" 2>/dev/null | tail -1)"
+    deployed="$(ssh "$SERVER" "plesk ext git --get-last-commit -domain $DOMAIN -name $REPO" 2>/dev/null \
+        | awk '/^commit /{sha=substr($2,1,7)} /^Date:/{getline; getline; sub(/^ +/,""); print sha" "$0; exit}')"
     info "Dernier commit déployé: ${deployed:-inconnu}"
 }
 
