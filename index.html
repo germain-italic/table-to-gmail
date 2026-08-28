@@ -192,6 +192,67 @@
   #preview table {
     margin: 0;
   }
+  /* Poignées de suppression : boutons nus dans la gouttière de l'aperçu.
+     Discrètes au repos, franches au survol — elles ne doivent pas concurrencer
+     le tableau, qui est ce qu'on vient regarder. */
+  #preview button.drop {
+    margin: 0;
+    padding: 0;
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+    line-height: 1;
+    font-weight: 400;
+    color: var(--text-muted);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    opacity: 0.35;
+    transition: opacity 0.12s, color 0.12s, border-color 0.12s;
+  }
+  #preview button.drop:hover {
+    opacity: 1;
+    color: var(--danger);
+    background: var(--surface);
+    border-color: var(--border);
+  }
+  #preview button.drop.back {
+    opacity: 1;
+    color: var(--accent);
+  }
+  #preview button.drop.back:hover {
+    color: var(--accent-hover);
+  }
+  #preview button.drop:focus-visible {
+    opacity: 1;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(44, 95, 141, 0.15);
+  }
+  #preview button.drop:active { transform: none; }
+  #dropInfo {
+    font-weight: 400;
+    font-style: italic;
+  }
+  #restoreAll {
+    margin: 0 0 0 4px;
+    padding: 0;
+    font-size: 13px;
+    font-weight: 400;
+    font-style: normal;
+    color: var(--accent);
+    background: none;
+    border: none;
+    border-radius: 0;
+    text-decoration: underline;
+  }
+  #restoreAll:hover { background: none; color: var(--accent-hover); }
+  #restoreAll:active { transform: none; }
+  /* Copie de repli (execCommand) : le tableau propre, sans les poignées. */
+  #clipHtml {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+  }
   #status {
     font-size: 13px;
     margin-top: 12px;
@@ -261,7 +322,7 @@
   <button id="copyBtn" type="button">Copier le tableau</button>
 </div>
 
-<div class="preview-label">Sortie</div>
+<div class="preview-label">Sortie <span id="dropInfo"></span></div>
 
 <ul class="nav nav-tabs" id="outputTabs" role="tablist">
   <li class="nav-item" role="presentation">
@@ -313,6 +374,8 @@
 
 <div id="status"></div>
 
+<div id="clipHtml" aria-hidden="true"></div>
+
 <footer>
   <p><strong>Confidentialité</strong> — Tout se passe dans ton navigateur. Le tableau que tu colles n'est jamais envoyé sur un serveur : il n'est ni enregistré, ni analysé, ni transmis à qui que ce soit. Pas de compte, pas de cookie, pas de traceur, aucune ressource externe chargée. Ferme l'onglet, il n'en reste rien. Seuls les journaux d'accès techniques du serveur web, habituels à tout hébergement, enregistrent la consultation de la page elle-même.</p>
   <p>Édité par <a href="https://www.italic.fr" target="_blank" rel="noopener">Italic — www.italic.fr</a></p>
@@ -331,6 +394,8 @@
   const format = document.getElementById('format');
   const detected = document.getElementById('detected');
   const csvSep = document.getElementById('csvSep');
+  const dropInfo = document.getElementById('dropInfo');
+  const clipHtml = document.getElementById('clipHtml');
   const tabs = [...document.querySelectorAll('#outputTabs .nav-link')];
   const optLabels = [...document.querySelectorAll('.controls label.opt')];
 
@@ -458,14 +523,34 @@
   // ─── GÉNÉRATEURS ──────────────────────────────────────────────────────────
   // Bloc autonome (aucune dépendance au DOM) : extrait tel quel par les tests.
 
+  // Lignes et colonnes retirées par l'utilisateur. Les index portent sur le
+  // tableau parsé, en-tête compris : c'est une ligne comme une autre.
+  function filterRows(rows, dropped) {
+    return rows
+      .filter((r, i) => !dropped.rows.has(i))
+      .map(r => r.filter((c, i) => !dropped.cols.has(i)));
+  }
+
+  // Styles en ligne du tableau Gmail, partagés avec l'aperçu pour que celui-ci
+  // reste fidèle à ce qui sera collé.
+  function gmailStyles(o) {
+    const cell = o.bordered
+      ? 'border: 1px solid #cccccc; padding: 6px 10px;'
+      : 'padding: 6px 10px;';
+    return {
+      table: 'border-collapse: collapse; font-family: Arial, sans-serif; font-size: 13px;',
+      cell: cell,
+      th: cell + ' background: #f3f3f3; font-weight: bold; text-align: left;'
+    };
+  }
+
   // Sortie Gmail : styles en ligne, seuls interprétés par le compositeur Gmail.
   function buildGmail(rows, o) {
     if (!rows.length) return '';
-    const tableStyle = 'border-collapse: collapse; font-family: Arial, sans-serif; font-size: 13px;';
-    const cellBase = o.bordered
-      ? 'border: 1px solid #cccccc; padding: 6px 10px;'
-      : 'padding: 6px 10px;';
-    const thStyle = cellBase + ' background: #f3f3f3; font-weight: bold; text-align: left;';
+    const s = gmailStyles(o);
+    const tableStyle = s.table;
+    const cellBase = s.cell;
+    const thStyle = s.th;
 
     let html = '<table style="' + tableStyle + '">';
     let startIdx = 0;
@@ -483,6 +568,43 @@
       html += '</tr>';
     }
     return html + '</tbody></table>';
+  }
+
+  // Aperçu interactif : le tableau entier — retiré ou non — flanqué d'une
+  // gouttière de croix, une par ligne et une par colonne. Gmail ne sait pas
+  // supprimer une ligne ni une colonne une fois le tableau collé ; on le fait
+  // donc ici, avant. Ce qui est retiré reste affiché, barré et grisé, avec une
+  // flèche pour le rétablir : la suppression n'engage à rien.
+  function buildPreview(rows, o, dropped) {
+    if (!rows.length) return '';
+    const s = gmailStyles(o);
+    const cols = rows[0].length;
+    const gutter = 'border: none; background: none; padding: 0 3px;';
+    const struck = ' color: #b0b0b0; text-decoration: line-through;';
+    const kept = rows.map((r, i) => i).filter(i => !dropped.rows.has(i));
+    const headerIdx = o.hasHeader ? kept[0] : -1;
+    const btn = (kind, i, gone) =>
+      '<td style="' + gutter + '"><button type="button" class="drop' + (gone ? ' back' : '') +
+      '" data-' + kind + '="' + i + '" title="' + (gone ? 'Rétablir' : 'Retirer') +
+      (kind === 'col' ? ' la colonne ' : ' la ligne ') + (i + 1) + '">' +
+      (gone ? '↩' : '×') + '</button></td>';
+
+    let html = '<table style="' + s.table + '"><tr><td style="' + gutter + '"></td>';
+    for (let c = 0; c < cols; c++) html += btn('col', c, dropped.cols.has(c));
+    html += '</tr>';
+    rows.forEach((row, r) => {
+      const rowGone = dropped.rows.has(r);
+      const pos = kept.indexOf(r) - (o.hasHeader ? 1 : 0);   // rang dans le corps rendu
+      const bg = (o.zebra && pos > 0 && pos % 2 === 1) ? ' background: #fafafa;' : '';
+      html += '<tr>' + btn('row', r, rowGone);
+      for (let c = 0; c < cols; c++) {
+        const gone = rowGone || dropped.cols.has(c);
+        html += '<td style="' + (r === headerIdx ? s.th : s.cell + bg) + (gone ? struck : '') +
+          '">' + esc(row[c] || '') + '</td>';
+      }
+      html += '</tr>';
+    });
+    return html + '</table>';
   }
 
   // Sortie HTML : balises nues, aucun style ni attribut, indentée.
@@ -556,13 +678,29 @@
 
   let current = 'gmail';
   const outputs = {};   // texte brut de chaque sortie, recalculé à chaque rendu
+  let plainFallback = '';   // repli texte du presse-papier pour la sortie Gmail
+
+  // Lignes et colonnes retirées au clic. Les index portent sur le tableau
+  // parsé : ils n'ont plus de sens dès que l'entrée change, d'où la remise à
+  // zéro à chaque nouvelle saisie ou changement de format.
+  const dropped = { rows: new Set(), cols: new Set() };
+
+  function resetDropped() {
+    dropped.rows.clear();
+    dropped.cols.clear();
+  }
+
+  function plural(n, mot) {
+    return n + ' ' + mot + (n > 1 ? 's' : '');
+  }
 
   function render() {
     const parsed = parseInput(src.value, format.value);
     detected.textContent = format.value === 'auto' && parsed.rows.length
       ? 'détecté : ' + FORMAT_LABELS[parsed.format]
       : '';
-    const rows = parsed.rows;
+    const all = parsed.rows;
+    const rows = filterRows(all, dropped);
     const o = {
       hasHeader: hasHeader.checked && rows.length > 0,
       bordered: bordered.checked,
@@ -570,8 +708,10 @@
     };
 
     const gmailHtml = buildGmail(rows, o);
-    preview.innerHTML = gmailHtml;
+    preview.innerHTML = buildPreview(all, o, dropped);
+    clipHtml.innerHTML = gmailHtml;
     htmlSource.textContent = gmailHtml;
+    plainFallback = rows.map(r => r.join('\t')).join('\n');
 
     outputs.gmail = gmailHtml;
     outputs.html = buildCleanHtml(rows, o.hasHeader);
@@ -582,6 +722,18 @@
     ['html', 'markdown', 'list', 'csv'].forEach(k => {
       document.getElementById('out-' + k).textContent = outputs[k];
     });
+
+    // Compteur de suppressions : visible depuis n'importe quel onglet, puisque
+    // le retrait vaut pour les cinq sorties, et pas seulement pour l'aperçu.
+    const gone = [];
+    if (dropped.cols.size) gone.push(plural(dropped.cols.size, 'colonne'));
+    if (dropped.rows.size) gone.push(plural(dropped.rows.size, 'ligne'));
+    const total = dropped.cols.size + dropped.rows.size;
+    dropInfo.innerHTML = !all.length ? ''
+      : total
+        ? gone.join(' et ') + (total > 1 ? ' retirées' : ' retirée') +
+          ' <button type="button" id="restoreAll">tout rétablir</button>'
+        : '— clique sur les × de l\'aperçu pour retirer une ligne ou une colonne';
 
     // N'afficher que les options qui agissent sur la sortie courante
     const active = OUTPUTS[current].opts;
@@ -625,13 +777,31 @@
   src.addEventListener('focus', () => {
     if (!exampleCleared && src.value === src.defaultValue) {
       src.value = '';
+      resetDropped();
       render();
     }
     exampleCleared = true;
   });
 
-  src.addEventListener('input', render);
-  format.addEventListener('change', render);
+  // Retrait / rétablissement au clic sur une poignée de l'aperçu
+  preview.addEventListener('click', e => {
+    const btn = e.target.closest('button.drop');
+    if (!btn) return;
+    const isCol = btn.dataset.col !== undefined;
+    const set = isCol ? dropped.cols : dropped.rows;
+    const i = Number(isCol ? btn.dataset.col : btn.dataset.row);
+    if (set.has(i)) set.delete(i); else set.add(i);
+    render();
+  });
+
+  dropInfo.addEventListener('click', e => {
+    if (e.target.id !== 'restoreAll') return;
+    resetDropped();
+    render();
+  });
+
+  src.addEventListener('input', () => { resetDropped(); render(); });
+  format.addEventListener('change', () => { resetDropped(); render(); });
   hasHeader.addEventListener('change', render);
   bordered.addEventListener('change', render);
   zebra.addEventListener('change', render);
@@ -658,12 +828,12 @@
     if (navigator.clipboard && window.ClipboardItem) {
       await navigator.clipboard.write([new ClipboardItem({
         'text/html': new Blob([html], { type: 'text/html' }),
-        'text/plain': new Blob([preview.innerText], { type: 'text/plain' })
+        'text/plain': new Blob([plainFallback], { type: 'text/plain' })
       })]);
       return;
     }
     const range = document.createRange();            // fallback : sélection + execCommand
-    range.selectNodeContents(preview);
+    range.selectNodeContents(clipHtml);              // le tableau nu, sans les poignées
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
