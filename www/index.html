@@ -575,7 +575,35 @@
     return piped >= 2 ? 'boxed' : 'tsv';
   }
 
+  // Un tableau Markdown copié depuis un rendu (chat, page web) perd souvent ses
+  // retours à la ligne : tout arrive sur une seule ligne. Le séparateur
+  // « |---|---|---| » donne le nombre de colonnes N, seul moyen fiable de
+  // retrouver les frontières — « | a | | c | » ne dit pas si le vide est une
+  // cellule ou une fin de ligne. Après découpage sur « | », chaque ligne pèse
+  // N cellules suivies du blanc entre le « | » fermant et le « | » ouvrant
+  // suivant, soit un pas de N+1. On réinsère les retours et la suite du
+  // traitement retrouve un Markdown ordinaire.
+  const RE_MD_SEP = /^\s*:?-{3,}:?\s*$/;
+
+  function reflowFlatMarkdown(text) {
+    if (/\r?\n/.test(text.trim()) || text.indexOf('|') === -1) return text;
+    let tokens = text.trim().split('|');
+    if (!tokens[0].trim()) tokens.shift();
+    if (tokens.length && !tokens[tokens.length - 1].trim()) tokens.pop();
+    const start = tokens.findIndex(t => RE_MD_SEP.test(t));
+    if (start === -1) return text;
+    let cols = 0;
+    while (RE_MD_SEP.test(tokens[start + cols] || '')) cols++;
+    if (cols < 2) return text;
+    const lines = [];
+    for (let i = 0; i < tokens.length; i += cols + 1) {
+      lines.push('| ' + tokens.slice(i, i + cols).map(c => c.trim()).join(' | ') + ' |');
+    }
+    return lines.join('\n');
+  }
+
   function parseInput(text, fmt) {
+    text = reflowFlatMarkdown(text);
     const chosen = (fmt && fmt !== 'auto') ? fmt : detectFormat(text);
     const rows = chosen === 'boxed' ? parseBoxed(text) : parseTsv(text);
     // Normaliser : toutes les lignes doivent avoir le même nombre de colonnes
