@@ -468,8 +468,63 @@
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
+  // Une cellule reste du texte partout sauf là où le format de sortie sait
+  // exprimer un lien. Cette petite abstraction permet de conserver les <a>
+  // présents dans le presse-papiers sans changer les parseurs texte.
+  function cellText(cell) {
+    return cell && typeof cell === 'object' ? cell.text : cell;
+  }
+
+  function cellHtml(cell) {
+    const text = cellText(cell);
+    const href = cell && typeof cell === 'object' ? cell.href : '';
+    return href ? '<a href="' + esc(href) + '">' + esc(text) + '</a>' : esc(text);
+  }
+
+  // Les sorties sans HTML restent exploitables : un libellé lié garde son
+  // adresse sous forme Markdown au lieu de perdre l'information du lien.
+  function plainCell(cell) {
+    const text = String(cellText(cell));
+    const href = cell && typeof cell === 'object' ? cell.href : '';
+    if (!href || href === text) return text;
+    return '[' + text.replace(/[\\\[\]]/g, '\\$&') + '](' + href + ')';
+  }
+
+  // Une URL écrite seule dans une cellule est aussi un lien : Claude peut
+  // produire ce format sans balise <a>, notamment dans un tableau Markdown.
+  function linkifyCell(value) {
+    if (value && typeof value === 'object') return value;
+    const text = markdownCell(value);
+    if (text && typeof text === 'string' && /^https?:\/\/\S+$/.test(text)) {
+      const href = safeHref(text);
+      if (href) return { text: text, href: href };
+    }
+    return text;
+  }
+
   // ─── PARSERS ──────────────────────────────────────────────────────────────
   // Bloc autonome (aucune dépendance au DOM) : extrait tel quel par les tests.
+  function safeHref(href) {
+    try {
+      const url = new URL(href);
+      return /^(https?:|mailto:)$/.test(url.protocol) ? url.href : '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  // Markdown courant dans les réponses de Claude : les backticks ne doivent
+  // pas apparaître dans le mail et un lien [libellé](URL) garde son URL.
+  function markdownCell(value) {
+    const text = String(value).replace(/`([^`]+)`/g, '$1');
+    const link = text.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+    if (link) {
+      const href = safeHref(link[2]);
+      return href ? { text: link[1], href: href } : text;
+    }
+    return text;
+  }
+
   const RE_BOX = /[─━═┌┬┐├┼┤└┴┘╔╦╗╠╬╣╚╩╝╭╮╰╯]/;
 
   // Bordure ou séparation : └───┴───┘, ├──┼──┤, |---|---|, +----+, |:--|--:|
@@ -605,7 +660,8 @@
   function parseInput(text, fmt) {
     text = reflowFlatMarkdown(text);
     const chosen = (fmt && fmt !== 'auto') ? fmt : detectFormat(text);
-    const rows = chosen === 'boxed' ? parseBoxed(text) : parseTsv(text);
+    const rows = (chosen === 'boxed' ? parseBoxed(text) : parseTsv(text))
+      .map(row => row.map(markdownCell));
     // Normaliser : toutes les lignes doivent avoir le même nombre de colonnes
     const maxCols = rows.reduce((m, r) => Math.max(m, r.length), 0);
     rows.forEach(r => { while (r.length < maxCols) r.push(''); });
@@ -649,7 +705,7 @@
     let startIdx = 0;
     if (o.hasHeader) {
       html += '<thead><tr>';
-      rows[0].forEach(c => html += '<th style="' + thStyle + '">' + esc(c) + '</th>');
+      rows[0].forEach(c => html += '<th style="' + thStyle + '">' + cellHtml(c) + '</th>');
       html += '</tr></thead>';
       startIdx = 1;
     }
@@ -657,7 +713,7 @@
     for (let i = startIdx; i < rows.length; i++) {
       const bg = (o.zebra && (i - startIdx) % 2 === 1) ? ' background: #fafafa;' : '';
       html += '<tr>';
-      rows[i].forEach(c => html += '<td style="' + cellBase + bg + '">' + esc(c) + '</td>');
+      rows[i].forEach(c => html += '<td style="' + cellBase + bg + '">' + cellHtml(c) + '</td>');
       html += '</tr>';
     }
     return html + '</tbody></table>';
@@ -694,7 +750,7 @@
       for (let c = 0; c < cols; c++) {
         const gone = rowGone || dropped.cols.has(c);
         html += '<td style="' + (r === headerIdx ? s.th : s.cell + bg) + (gone ? struck : '') +
-          '">' + esc(row[c] || '') + '</td>';
+          '">' + cellHtml(row[c] || '') + '</td>';
       }
       html += '</tr>';
     });
@@ -705,7 +761,7 @@
   function buildCleanHtml(rows, hasHeader) {
     if (!rows.length) return '';
     const tr = (cells, tag) =>
-      '    <tr>' + cells.map(c => `<${tag}>` + esc(c) + `</${tag}>`).join('') + '</tr>';
+      '    <tr>' + cells.map(c => `<${tag}>` + cellHtml(c) + `</${tag}>`).join('') + '</tr>';
     const out = ['<table>'];
     let startIdx = 0;
     if (hasHeader) {
@@ -721,7 +777,7 @@
   // Sortie Markdown : colonnes alignées pour rester lisible en texte brut.
   function buildMarkdown(rows, hasHeader) {
     if (!rows.length) return '';
-    const cell = c => String(c).replace(/\|/g, '\\|');           // un | casserait la colonne
+    const cell = c => plainCell(c).replace(/\|/g, '\\|');         // un | casserait la colonne
     const width = s => Array.from(s).length;                      // compte les code points
     const body = rows.map(r => r.map(cell));
     const header = hasHeader ? body[0] : body[0].map(() => '');
@@ -739,13 +795,13 @@
 
   // Sortie liste : une ligne par enregistrement, cellules séparées par des virgules.
   function buildList(rows) {
-    return rows.map(r => r.join(', ')).join('\n');
+    return rows.map(r => r.map(plainCell).join(', ')).join('\n');
   }
 
   // Sortie CSV (RFC 4180) : guillemets doublés, champ encadré dès qu'il est ambigu.
   function buildCsv(rows, sep) {
     const q = c => {
-      const s = String(c);
+      const s = plainCell(c);
       return (s.includes(sep) || s.includes('"') || /[\r\n]/.test(s) || s !== s.trim())
         ? '"' + s.replace(/"/g, '""') + '"'
         : s;
@@ -762,7 +818,7 @@
   const I18N = {
     fr: {
       pageTitle: 'Convertisseur de tableaux',
-      intro: 'Collez un texte tabulé (copié depuis Excel, un export, etc.) ou un tableau encadré (généré par Claude Code, Markdown, ASCII). Choisissez la sortie voulue dans les onglets, puis copiez : la sortie Gmail arrive <em>rendue</em> dans le presse-papier (Ctrl+V dans Gmail), les autres en texte brut.',
+      intro: 'Collez un texte tabulé (copié depuis Excel, un export, etc.) ou un tableau encadré (généré par Claude Code, Markdown, ASCII). Les liens d’un tableau copié sont conservés. Choisissez la sortie voulue dans les onglets, puis copiez : la sortie Gmail arrive <em>rendue</em> dans le presse-papier (Ctrl+V dans Gmail), les autres en texte brut.',
       inputLabel: 'Tableau en entrée',
       placeholder: 'Collez ici un tableau tabulé ou encadré…',
       formatAria: "Format d'entrée",
@@ -806,7 +862,7 @@
     },
     en: {
       pageTitle: 'Table converter',
-      intro: 'Paste tab-separated text (copied from Excel, an export, and so on) or a boxed table (produced by Claude Code, Markdown, ASCII). Pick the output you need from the tabs, then copy: the Gmail output reaches the clipboard <em>rendered</em> (Ctrl+V into Gmail), the others as plain text.',
+      intro: 'Paste tab-separated text (copied from Excel, an export, and so on) or a boxed table (produced by Claude Code, Markdown, ASCII). Links in a copied table are preserved. Pick the output you need from the tabs, then copy: the Gmail output reaches the clipboard <em>rendered</em> (Ctrl+V into Gmail), the others as plain text.',
       inputLabel: 'Input table',
       placeholder: 'Paste a tab-separated or boxed table here…',
       formatAria: 'Input format',
@@ -900,6 +956,51 @@
   let current = 'gmail';
   const outputs = {};   // texte brut de chaque sortie, recalculé à chaque rendu
   let plainFallback = '';   // repli texte du presse-papier pour la sortie Gmail
+  let pastedLinks = null; // liens lus du fragment HTML du dernier collage
+  let keepPastedLinksOnNextInput = false;
+
+  // Le textarea ne conserve par définition que text/plain. Au moment du
+  // collage, le presse-papiers contient aussi souvent le tableau HTML rendu
+  // par Claude : on en prélève uniquement le texte et le premier href de
+  // chaque cellule. Les attributs et balises inconnus ne passent jamais dans
+  // notre HTML de sortie.
+  function linksFromClipboard(html) {
+    if (!html || !window.DOMParser) return null;
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const anchors = [...doc.querySelectorAll('a[href]')].map(a => ({
+      text: a.textContent.trim(), href: safeHref(a.getAttribute('href'))
+    })).filter(link => link.text && link.href);
+    const table = doc.querySelector('table');
+    if (!table) return anchors.length ? { rows: null, anchors: anchors } : null;
+    const rows = [...table.querySelectorAll('tr')].map(tr =>
+      [...tr.querySelectorAll(':scope > th, :scope > td')].map(td => {
+        const link = td.querySelector('a[href]');
+        return { text: td.textContent.trim(), href: link ? safeHref(link.getAttribute('href')) : '' };
+      })
+    ).filter(row => row.length);
+    return rows.length || anchors.length ? { rows: rows, anchors: anchors } : null;
+  }
+
+  // La correspondance stricte évite de rattacher un ancien lien si l'utilisateur
+  // a modifié le textarea entre-temps. Les parseurs continuent à travailler sur
+  // des chaînes ; les objets ne sont ajoutés qu'après leur travail.
+  function restorePastedLinks(rows) {
+    const clipboardRows = pastedLinks && pastedLinks.rows;
+    const matches = clipboardRows && clipboardRows.length === rows.length && rows.every((row, r) =>
+      clipboardRows[r].length === row.length && row.every((cell, c) =>
+        clipboardRows[r][c].text === String(cellText(cell)).trim()
+      )
+    );
+    const looseAnchors = !matches && pastedLinks ? [...pastedLinks.anchors] : [];
+    return rows.map((row, r) => row.map((cell, c) => {
+      let href = matches ? clipboardRows[r][c].href : '';
+      if (!href) {
+        const i = looseAnchors.findIndex(link => link.text === String(cellText(cell)).trim());
+        if (i !== -1) href = looseAnchors.splice(i, 1)[0].href;
+      }
+      return href ? { text: cellText(cell), href: href } : linkifyCell(cell);
+    }));
+  }
 
   // Lignes et colonnes retirées au clic. Les index portent sur le tableau
   // parsé : ils n'ont plus de sens dès que l'entrée change, d'où la remise à
@@ -921,7 +1022,7 @@
     detected.textContent = format.value === 'auto' && parsed.rows.length
       ? t.detectedPrefix + t.format[parsed.format]
       : '';
-    const all = parsed.rows;
+    const all = restorePastedLinks(parsed.rows);
     const rows = filterRows(all, dropped);
     const o = {
       hasHeader: hasHeader.checked && rows.length > 0,
@@ -933,7 +1034,7 @@
     preview.innerHTML = buildPreview(all, o, dropped, t);
     clipHtml.innerHTML = gmailHtml;
     htmlSource.textContent = gmailHtml;
-    plainFallback = rows.map(r => r.join('\t')).join('\n');
+    plainFallback = rows.map(r => r.map(plainCell).join('\t')).join('\n');
 
     outputs.gmail = gmailHtml;
     outputs.html = buildCleanHtml(rows, o.hasHeader);
@@ -1031,7 +1132,18 @@
     applyI18n();
   }));
 
-  src.addEventListener('input', () => { resetDropped(); render(); });
+  src.addEventListener('paste', e => {
+    pastedLinks = linksFromClipboard(e.clipboardData && e.clipboardData.getData('text/html'));
+    // L'événement input suit paste : il doit garder les liens précisément une fois.
+    keepPastedLinksOnNextInput = Boolean(pastedLinks);
+  });
+
+  src.addEventListener('input', () => {
+    if (keepPastedLinksOnNextInput) keepPastedLinksOnNextInput = false;
+    else pastedLinks = null;
+    resetDropped();
+    render();
+  });
   format.addEventListener('change', () => { resetDropped(); render(); });
   hasHeader.addEventListener('change', render);
   bordered.addEventListener('change', render);
