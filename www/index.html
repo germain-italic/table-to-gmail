@@ -978,7 +978,43 @@
         return { text: td.textContent.trim(), href: link ? safeHref(link.getAttribute('href')) : '' };
       })
     ).filter(row => row.length);
-    return rows.length || anchors.length ? { rows: rows, anchors: anchors } : null;
+    // text/plain omet parfois les cellules vides placées au début d'une ligne
+    // (cas courant : colonne de numérotation sans libellé dans le thead). On
+    // garde ce détail de structure du HTML afin de le restituer après le
+    // découpage TSV, qui ne peut pas le deviner seul.
+    const headerRow = table.querySelector('thead tr') ||
+      [...table.querySelectorAll('tr')].find(tr => tr.querySelector(':scope > th'));
+    let leadingEmptyHeaderCells = 0;
+    if (headerRow) {
+      for (const cell of headerRow.querySelectorAll(':scope > th, :scope > td')) {
+        if (cell.textContent.trim()) break;
+        leadingEmptyHeaderCells++;
+      }
+    }
+    return rows.length || anchors.length
+      ? { rows: rows, anchors: anchors, leadingEmptyHeaderCells: leadingEmptyHeaderCells }
+      : null;
+  }
+
+  // Le texte fourni par le navigateur peut perdre le premier champ vide du
+  // thead. parseInput complète alors la ligne à droite pour égaler la largeur
+  // des données, ce qui décale visuellement tous les titres. Lorsque le HTML
+  // du même collage confirme ce champ vide, on déplace uniquement les blancs
+  // de remplissage vers le début de l'en-tête.
+  function restoreLeadingEmptyHeaderCells(rows) {
+    const missing = pastedLinks && pastedLinks.leadingEmptyHeaderCells;
+    if (!missing || !rows.length) return rows;
+    const header = rows[0];
+    let alreadyThere = 0;
+    while (alreadyThere < missing && !String(cellText(header[alreadyThere])).trim()) {
+      alreadyThere++;
+    }
+    const count = missing - alreadyThere;
+    if (count <= 0) return rows;
+    const padding = header.slice(-count);
+    if (padding.length !== count || padding.some(cell => String(cellText(cell)).trim())) return rows;
+    rows[0] = Array(count).fill('').concat(header.slice(0, -count));
+    return rows;
   }
 
   // La correspondance stricte évite de rattacher un ancien lien si l'utilisateur
@@ -1019,6 +1055,7 @@
   function render() {
     const t = T();
     const parsed = parseInput(src.value, format.value);
+    restoreLeadingEmptyHeaderCells(parsed.rows);
     detected.textContent = format.value === 'auto' && parsed.rows.length
       ? t.detectedPrefix + t.format[parsed.format]
       : '';
