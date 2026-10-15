@@ -217,11 +217,11 @@ show_menu() {
 
     echo -e "${GREEN}table-to-gmail${NC}  $DOMAIN"
     echo
-    echo -e "  ${YELLOW}1)${NC} Lancer le serveur local"
-    echo -e "  ${YELLOW}2)${NC} Arrêter le serveur local"
-    echo -e "  ${YELLOW}3)${NC} Relancer le serveur local"
-    echo -e "  ${YELLOW}4)${NC} État : local, production, commits"
-    echo -e "  ${YELLOW}5)${NC} Déployer sur $SERVER"
+    echo -e "  ${YELLOW}l)${NC} Lancer le serveur local"
+    echo -e "  ${YELLOW}a)${NC} Arrêter le serveur local"
+    echo -e "  ${YELLOW}r)${NC} Relancer le serveur local"
+    echo -e "  ${YELLOW}e)${NC} État : local, production, commits"
+    echo -e "  ${YELLOW}d)${NC} Déployer sur $SERVER"
     echo
     echo -e "  ${RED}q)${NC} Quitter"
     echo
@@ -238,12 +238,12 @@ menu() {
         show_menu
         read -rp "Votre choix : " choix || { echo; exit 0; }
         case "$choix" in
-            1) echo; start;        pause ;;
-            2) echo; stop;         pause ;;
-            3) echo; stop && start; pause ;;
-            4) echo; status;       pause ;;
-            5) echo; deploy;       pause ;;
-            q|Q|0) clear; exit 0 ;;
+            l|L) echo; start;        pause ;;
+            a|A) echo; stop;         pause ;;
+            r|R) echo; stop && start; pause ;;
+            e|E) echo; status;       pause ;;
+            d|D) echo; deploy;       pause ;;
+            q|Q) clear; exit 0 ;;
             *) ;;
         esac
     done
