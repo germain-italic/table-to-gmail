@@ -376,6 +376,7 @@
   <label class="opt" data-opt="hasHeader"><input type="checkbox" id="hasHeader" checked> <span data-i18n="optHeader">Première ligne = en-tête</span></label>
   <label class="opt" data-opt="bordered"><input type="checkbox" id="bordered" checked> <span data-i18n="optBordered">Bordures</span></label>
   <label class="opt" data-opt="zebra"><input type="checkbox" id="zebra"> <span data-i18n="optZebra">Lignes alternées</span></label>
+  <label class="opt" data-opt="markdown"><input type="checkbox" id="markdown" checked> <span data-i18n="optMarkdown">Interpréter le Markdown</span></label>
   <button id="copyBtn" type="button">Copier le tableau</button>
 </div>
 
@@ -453,6 +454,7 @@
   const hasHeader = document.getElementById('hasHeader');
   const bordered = document.getElementById('bordered');
   const zebra = document.getElementById('zebra');
+  const interpretMd = document.getElementById('markdown');
   const copyBtn = document.getElementById('copyBtn');
   const status = document.getElementById('status');
   const format = document.getElementById('format');
@@ -492,9 +494,9 @@
 
   // Une URL écrite seule dans une cellule est aussi un lien : Claude peut
   // produire ce format sans balise <a>, notamment dans un tableau Markdown.
-  function linkifyCell(value) {
+  function linkifyCell(value, interpret) {
     if (value && typeof value === 'object') return value;
-    const text = markdownCell(value);
+    const text = interpret === false ? String(value) : markdownCell(value);
     if (text && typeof text === 'string' && /^https?:\/\/\S+$/.test(text)) {
       const href = safeHref(text);
       if (href) return { text: text, href: href };
@@ -657,11 +659,11 @@
     return lines.join('\n');
   }
 
-  function parseInput(text, fmt) {
+  function parseInput(text, fmt, interpret) {
     text = reflowFlatMarkdown(text);
     const chosen = (fmt && fmt !== 'auto') ? fmt : detectFormat(text);
     const rows = (chosen === 'boxed' ? parseBoxed(text) : parseTsv(text))
-      .map(row => row.map(markdownCell));
+      .map(row => row.map(cell => interpret === false ? cell : markdownCell(cell)));
     // Normaliser : toutes les lignes doivent avoir le même nombre de colonnes
     const maxCols = rows.reduce((m, r) => Math.max(m, r.length), 0);
     rows.forEach(r => { while (r.length < maxCols) r.push(''); });
@@ -828,6 +830,7 @@
       optHeader: 'Première ligne = en-tête',
       optBordered: 'Bordures',
       optZebra: 'Lignes alternées',
+      optMarkdown: 'Interpréter le Markdown',
       outputLabel: 'Sortie',
       tabHtml: 'HTML propre',
       tabList: 'Liste',
@@ -872,6 +875,7 @@
       optHeader: 'First row is a header',
       optBordered: 'Borders',
       optZebra: 'Alternating rows',
+      optMarkdown: 'Interpret Markdown',
       outputLabel: 'Output',
       tabHtml: 'Clean HTML',
       tabList: 'List',
@@ -946,11 +950,11 @@
   // Par sortie, les options du haut qui la concernent. Le libellé du bouton,
   // lui, dépend de la langue : il vit dans le dictionnaire.
   const OUTPUTS = {
-    gmail:    { opts: ['hasHeader', 'bordered', 'zebra'] },
-    html:     { opts: ['hasHeader'] },
-    markdown: { opts: ['hasHeader'] },
-    list:     { opts: [] },
-    csv:      { opts: [] }
+    gmail:    { opts: ['hasHeader', 'bordered', 'zebra', 'markdown'] },
+    html:     { opts: ['hasHeader', 'markdown'] },
+    markdown: { opts: ['hasHeader', 'markdown'] },
+    list:     { opts: ['markdown'] },
+    csv:      { opts: ['markdown'] }
   };
 
   let current = 'gmail';
@@ -1020,7 +1024,7 @@
   // La correspondance stricte évite de rattacher un ancien lien si l'utilisateur
   // a modifié le textarea entre-temps. Les parseurs continuent à travailler sur
   // des chaînes ; les objets ne sont ajoutés qu'après leur travail.
-  function restorePastedLinks(rows) {
+  function restorePastedLinks(rows, interpret) {
     const clipboardRows = pastedLinks && pastedLinks.rows;
     const matches = clipboardRows && clipboardRows.length === rows.length && rows.every((row, r) =>
       clipboardRows[r].length === row.length && row.every((cell, c) =>
@@ -1034,7 +1038,7 @@
         const i = looseAnchors.findIndex(link => link.text === String(cellText(cell)).trim());
         if (i !== -1) href = looseAnchors.splice(i, 1)[0].href;
       }
-      return href ? { text: cellText(cell), href: href } : linkifyCell(cell);
+      return href ? { text: cellText(cell), href: href } : linkifyCell(cell, interpret);
     }));
   }
 
@@ -1054,12 +1058,12 @@
 
   function render() {
     const t = T();
-    const parsed = parseInput(src.value, format.value);
+    const parsed = parseInput(src.value, format.value, interpretMd.checked);
     restoreLeadingEmptyHeaderCells(parsed.rows);
     detected.textContent = format.value === 'auto' && parsed.rows.length
       ? t.detectedPrefix + t.format[parsed.format]
       : '';
-    const all = restorePastedLinks(parsed.rows);
+    const all = restorePastedLinks(parsed.rows, interpretMd.checked);
     const rows = filterRows(all, dropped);
     const o = {
       hasHeader: hasHeader.checked && rows.length > 0,
@@ -1185,6 +1189,7 @@
   hasHeader.addEventListener('change', render);
   bordered.addEventListener('change', render);
   zebra.addEventListener('change', render);
+  interpretMd.addEventListener('change', render);
   csvSep.addEventListener('change', render);
 
   // Copie texte brut, pour toutes les sorties sauf Gmail
